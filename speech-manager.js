@@ -1,4 +1,4 @@
-// Enhanced Speech Manager with Premium Voice Toggle
+// Enhanced Speech Manager with Voice Slider (Mute, Female, Male)
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -9,11 +9,12 @@ class SpeechManager {
         this.bestVoice = null;
         this.currentAudio = null;
         
-        // Voice toggle settings
-        this.premiumVoiceEnabled = false; // Default to free browser TTS
+        // Voice settings - 0: Mute, 1: Female, 2: Male
+        this.voiceMode = 0; // Default to mute
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.selectedVoiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice
+        this.femaleVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Bella - Female voice
+        this.maleVoiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam - Male voice
         
         this.initializeElements();
         this.initializeSpeech();
@@ -27,51 +28,135 @@ class SpeechManager {
         this.statusText = document.getElementById('status-text');
         this.statusIndicator = document.getElementById('status-indicator');
         this.messageInput = document.getElementById('message-input');
-        this.voiceToggle = document.getElementById('voice-toggle');
-        this.toggleIcon = document.getElementById('toggle-icon');
-        this.toggleText = document.getElementById('toggle-text');
+        this.voiceSliderContainer = document.getElementById('voice-slider-container');
+        this.voiceRange = document.getElementById('voice-range');
+        this.voiceIndicator = document.getElementById('voice-indicator');
     }
 
     async checkElevenLabsAPI() {
         try {
+            console.log('Checking ElevenLabs API availability...');
+            
             const response = await fetch('/.netlify/functions/elevenlabs-key');
+            
+            console.log('ElevenLabs key check response status:', response.status);
+            
             if (response.ok) {
                 const data = await response.json();
                 this.elevenLabsAvailable = data.available;
                 this.elevenLabsApiKey = data.apiKey;
-                console.log('ElevenLabs API check:', this.elevenLabsAvailable ? 'Available' : 'Not available');
                 
-                // Update toggle visibility
-                this.updateToggleVisibility();
+                console.log('ElevenLabs API check result:', {
+                    available: this.elevenLabsAvailable,
+                    hasApiKey: !!data.apiKey
+                });
+                
+                // Update slider visibility
+                this.updateSliderVisibility();
             } else {
+                console.error('ElevenLabs key check failed with status:', response.status);
+                const errorText = await response.text();
+                console.error('Error details:', errorText);
+                
                 this.elevenLabsAvailable = false;
-                this.updateToggleVisibility();
+                this.updateSliderVisibility();
             }
         } catch (error) {
-            console.log('ElevenLabs API check failed');
+            console.error('ElevenLabs API check failed with error:', error);
             this.elevenLabsAvailable = false;
-            this.updateToggleVisibility();
+            this.updateSliderVisibility();
         }
     }
 
-    updateToggleVisibility() {
-        if (!this.voiceToggle) return;
+    updateSliderVisibility() {
+        if (!this.voiceSliderContainer) return;
         
         if (this.elevenLabsAvailable) {
-            this.voiceToggle.style.display = 'flex';
-            this.updateToggleState();
+            this.voiceSliderContainer.style.display = 'flex';
+            this.updateVoiceIndicator();
         } else {
-            this.voiceToggle.style.display = 'none';
-            this.premiumVoiceEnabled = false;
+            this.voiceButton.innerHTML = '🎤';
+        }
+    }
+
+    updateStatus(text, indicator) {
+        this.statusText.textContent = text;
+        this.statusIndicator.textContent = indicator;
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        
+        document.querySelector('.chat-container').insertBefore(errorDiv, document.getElementById('messages'));
+        
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
+    }
+
+    // Event callback setters
+    setOnListeningStart(callback) {
+        this.onListeningStart = callback;
+    }
+
+    setOnSpeechResult(callback) {
+        this.onSpeechResult = callback;
+    }
+
+    // Getters
+    getIsListening() {
+        return this.isListening;
+    }
+
+    getIsSpeaking() {
+        return this.isSpeaking;
+    }
+
+    getVoiceMode() {
+        return this.voiceMode;
+    }
+
+    getElevenLabsAvailable() {
+        return this.elevenLabsAvailable;
+    }
+
+    // Legacy compatibility methods (for existing code)
+    getIsPremiumVoiceEnabled() {
+        return this.voiceMode > 0 && this.elevenLabsAvailable;
+    }
+
+    togglePremiumVoice() {
+        // Legacy method - now cycles through voice modes
+        this.voiceMode = (this.voiceMode + 1) % 3;
+        if (this.voiceRange) {
+            this.voiceRange.value = this.voiceMode;
+        }
+        this.saveVoicePreference();
+        this.updateVoiceIndicator();
+        
+        const messages = {
+            0: 'Voice muted',
+            1: 'Female voice selected',
+            2: 'Male voice selected'
+        };
+        this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
+    }
+}voiceSliderContainer.style.display = 'none';
+            this.voiceMode = 0; // Force mute if ElevenLabs not available
         }
     }
 
     loadVoicePreference() {
         try {
-            const saved = localStorage.getItem('talbot-premium-voice');
+            const saved = localStorage.getItem('talbot-voice-mode');
             if (saved !== null) {
-                this.premiumVoiceEnabled = JSON.parse(saved);
-                this.updateToggleState();
+                this.voiceMode = parseInt(saved, 10);
+                if (this.voiceRange) {
+                    this.voiceRange.value = this.voiceMode;
+                }
+                this.updateVoiceIndicator();
             }
         } catch (error) {
             console.error('Error loading voice preference:', error);
@@ -80,67 +165,19 @@ class SpeechManager {
 
     saveVoicePreference() {
         try {
-            localStorage.setItem('talbot-premium-voice', JSON.stringify(this.premiumVoiceEnabled));
+            localStorage.setItem('talbot-voice-mode', this.voiceMode.toString());
         } catch (error) {
             console.error('Error saving voice preference:', error);
         }
     }
 
-    togglePremiumVoice() {
-        if (!this.elevenLabsAvailable) {
-            this.showVoiceStatus('Premium voice not available', false);
-            return;
-        }
-
-        this.premiumVoiceEnabled = !this.premiumVoiceEnabled;
-        this.saveVoicePreference();
-        this.updateToggleState();
+    updateVoiceIndicator() {
+        if (!this.voiceIndicator) return;
         
-        // Show status message
-        const message = this.premiumVoiceEnabled ? 
-            'Premium voice enabled - Natural AI speech' : 
-            'Premium voice disabled - Using browser speech';
-        this.showVoiceStatus(message, this.premiumVoiceEnabled);
+        const labels = ['Mute', 'Female', 'Male'];
+        this.voiceIndicator.textContent = labels[this.voiceMode] || 'Mute';
         
-        console.log('Premium voice:', this.premiumVoiceEnabled ? 'Enabled' : 'Disabled');
-    }
-
-    updateToggleState() {
-        if (!this.voiceToggle) return;
-        
-        if (this.premiumVoiceEnabled) {
-            this.voiceToggle.classList.add('premium');
-            this.toggleIcon.textContent = '✨';
-            this.toggleText.textContent = 'Premium Voice';
-        } else {
-            this.voiceToggle.classList.remove('premium');
-            this.toggleIcon.textContent = '🔊';
-            this.toggleText.textContent = 'Basic Voice';
-        }
-    }
-
-    showVoiceStatus(message, isPremium) {
-        // Remove existing status
-        const existingStatus = document.querySelector('.voice-status');
-        if (existingStatus) {
-            existingStatus.remove();
-        }
-
-        // Create new status
-        const statusDiv = document.createElement('div');
-        statusDiv.className = `voice-status ${isPremium ? 'premium' : ''}`;
-        statusDiv.textContent = message;
-        
-        document.body.appendChild(statusDiv);
-        
-        // Show with animation
-        setTimeout(() => statusDiv.classList.add('show'), 100);
-        
-        // Hide after delay
-        setTimeout(() => {
-            statusDiv.classList.remove('show');
-            setTimeout(() => statusDiv.remove(), 300);
-        }, 2500);
+        console.log('Voice mode updated to:', labels[this.voiceMode]);
     }
 
     initializeSpeech() {
@@ -228,9 +265,21 @@ class SpeechManager {
     }
 
     bindEvents() {
-        // Voice toggle button
-        if (this.voiceToggle) {
-            this.voiceToggle.addEventListener('click', () => this.togglePremiumVoice());
+        // Voice slider events
+        if (this.voiceRange) {
+            this.voiceRange.addEventListener('input', (e) => {
+                this.voiceMode = parseInt(e.target.value, 10);
+                this.saveVoicePreference();
+                this.updateVoiceIndicator();
+                
+                // Show feedback message
+                const messages = {
+                    0: 'Voice muted',
+                    1: 'Female voice selected',
+                    2: 'Male voice selected'
+                };
+                this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
+            });
         }
 
         // Voice button events
@@ -256,6 +305,41 @@ class SpeechManager {
         });
     }
 
+    showVoiceStatus(message, isActive) {
+        // Remove existing status
+        const existingStatus = document.querySelector('.voice-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+
+        // Create new status
+        const statusDiv = document.createElement('div');
+        statusDiv.className = `voice-status ${isActive ? 'active' : ''}`;
+        statusDiv.textContent = message;
+        statusDiv.style.cssText = `
+            position: fixed; top: 20px; right: 20px; z-index: 1001;
+            background: ${isActive ? '#27ae60' : '#95a5a6'};
+            color: white; padding: 8px 16px; border-radius: 6px; font-size: 13px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-family: 'Lora', serif;
+            transform: translateY(-10px); opacity: 0; transition: all 0.3s ease;
+        `;
+        
+        document.body.appendChild(statusDiv);
+        
+        // Show with animation
+        setTimeout(() => {
+            statusDiv.style.transform = 'translateY(0)';
+            statusDiv.style.opacity = '1';
+        }, 100);
+        
+        // Hide after delay
+        setTimeout(() => {
+            statusDiv.style.transform = 'translateY(-10px)';
+            statusDiv.style.opacity = '0';
+            setTimeout(() => statusDiv.remove(), 300);
+        }, 2000);
+    }
+
     startListening() {
         if (this.recognition && !this.isListening) {
             this.recognition.start();
@@ -271,17 +355,20 @@ class SpeechManager {
         }
     }
 
-    // Enhanced speak method with toggle support
+    // Enhanced speak method with voice mode support
     async speakMessage(text) {
-        if (!text) return;
+        if (!text || this.voiceMode === 0) {
+            console.log('Speech skipped - voice is muted or no text');
+            return; // Skip if muted or no text
+        }
         
         this.stopSpeaking();
         
         const naturalText = this.makeTextMoreNatural(text);
         
-        // Use premium voice if enabled and available
-        if (this.premiumVoiceEnabled && this.elevenLabsAvailable) {
-            console.log('Using ElevenLabs premium voice');
+        // Use ElevenLabs if available, otherwise fall back to browser TTS
+        if (this.elevenLabsAvailable) {
+            console.log(`Using ElevenLabs ${this.voiceMode === 1 ? 'female' : 'male'} voice`);
             await this.speakWithElevenLabs(naturalText);
         } else {
             console.log('Using browser voice');
@@ -293,7 +380,12 @@ class SpeechManager {
         try {
             this.isSpeaking = true;
             this.updateVoiceButton();
-            this.updateStatus('Talbot is speaking... ✨', '🗣️');
+            
+            const voiceType = this.voiceMode === 1 ? 'female' : 'male';
+            this.updateStatus(`Talbot is speaking... (${voiceType})`, '🗣️');
+
+            // Select voice ID based on mode
+            const selectedVoiceId = this.voiceMode === 1 ? this.femaleVoiceId : this.maleVoiceId;
 
             const response = await fetch('/.netlify/functions/elevenlabs-tts', {
                 method: 'POST',
@@ -302,11 +394,11 @@ class SpeechManager {
                 },
                 body: JSON.stringify({
                     text: text,
-                    voice_id: this.selectedVoiceId,
+                    voice_id: selectedVoiceId,
                     voice_settings: {
                         stability: 0.75,
                         similarity_boost: 0.85,
-                        style: 0.6, // Slightly more expressive for mental health context
+                        style: 0.6,
                         use_speaker_boost: true
                     }
                 })
@@ -434,50 +526,4 @@ class SpeechManager {
             this.voiceButton.classList.add('speaking');
             this.voiceButton.innerHTML = '🔊';
         } else {
-            this.voiceButton.innerHTML = '🎤';
-        }
-    }
-
-    updateStatus(text, indicator) {
-        this.statusText.textContent = text;
-        this.statusIndicator.textContent = indicator;
-    }
-
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        
-        document.querySelector('.chat-container').insertBefore(errorDiv, document.getElementById('messages'));
-        
-        setTimeout(() => {
-            errorDiv.remove();
-        }, 5000);
-    }
-
-    // Event callback setters
-    setOnListeningStart(callback) {
-        this.onListeningStart = callback;
-    }
-
-    setOnSpeechResult(callback) {
-        this.onSpeechResult = callback;
-    }
-
-    // Getters
-    getIsListening() {
-        return this.isListening;
-    }
-
-    getIsSpeaking() {
-        return this.isSpeaking;
-    }
-
-    getIsPremiumVoiceEnabled() {
-        return this.premiumVoiceEnabled;
-    }
-
-    getElevenLabsAvailable() {
-        return this.elevenLabsAvailable;
-    }
-}
+            this.
