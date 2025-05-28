@@ -46,17 +46,19 @@
 <body>
     <div class="container">
         <div class="header">
-            <!-- Center content -->
-            <h1>Talbot</h1>
-            <p class="header-subtitle">Your Mental Health Companion</p>
+            <!-- Left side - Logo and subtitle -->
+            <div class="header-content">
+                <h1>Talbot</h1>
+                <p class="header-subtitle">Your Mental Health Companion</p>
+            </div>
             
-            <!-- Profile and Voice Controls (right side) -->
+            <!-- Right side - Profile and Voice Controls -->
             <div class="header-controls">
                 <button class="profile-button" id="profile-button">Profile</button>
                 
                 <!-- Voice Slider -->
                 <div class="voice-slider-container" id="voice-slider-container">
-                    <label class="voice-slider-label">Voice</label>
+                    <label class="voice-slider-label">Voice Settings</label>
                     <div class="voice-slider" id="voice-slider">
                         <input type="range" min="0" max="2" value="0" step="1" class="slider" id="voice-range">
                         <div class="slider-labels">
@@ -69,7 +71,7 @@
                 </div>
             </div>
             
-            <!-- Status (bottom center) -->
+            <!-- Status (centered at bottom) -->
             <div class="status">
                 <span id="status-text">Talk to me, I'm here</span>
                 <span id="status-indicator">🖤</span>
