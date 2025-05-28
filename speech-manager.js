@@ -13,7 +13,7 @@ class SpeechManager {
         this.voiceMode = 0; // Default to mute
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.femaleVoiceId = 'mFgXOmlOfXfr6suoQkRH'; // Frances - Female voice
+        this.femaleVoiceId = 'uhYnkYTBc711oAY590Ea'; // Charlotte - Female voice
         this.maleVoiceId = 'G0yjIg3xY8gEJZkHpjVm'; // Brian - Male voice
         this.voiceSettingsExpanded = false; // Track expansion state
         
