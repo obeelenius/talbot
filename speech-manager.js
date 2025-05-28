@@ -1,4 +1,4 @@
-// Enhanced Speech Manager with Collapsible Voice Settings
+// Enhanced Speech Manager with Development Mode and Credit Saving
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -10,18 +10,22 @@ class SpeechManager {
         this.currentAudio = null;
         
         // Voice settings - 0: Mute, 1: Female, 2: Male
-        this.voiceMode = 0; // Default to mute
+        this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.femaleVoiceId = 'uhYnkYTBc711oAY590Ea'; // Charlotte - Female voice
-        this.maleVoiceId = 'G0yjIg3xY8gEJZkHpjVm'; // Brian - Male voice
+        this.femaleVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Bella - Female voice
+        this.maleVoiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam - Male voice
         this.voiceSettingsExpanded = false; // Track expansion state
+        
+        // Usage tracking
+        this.elevenLabsCallCount = parseInt(localStorage.getItem(TalbotConfig.SETTINGS.STORAGE_KEYS.ELEVENLABS_CALLS) || '0');
         
         this.initializeElements();
         this.initializeSpeech();
         this.bindEvents();
         this.checkElevenLabsAPI();
         this.loadVoicePreference();
+        this.showDevModeStatus();
     }
 
     initializeElements() {
@@ -35,7 +39,32 @@ class SpeechManager {
         this.voiceIndicator = document.getElementById('voice-indicator');
     }
 
+    showDevModeStatus() {
+        if (TalbotConfig.DEVELOPMENT_MODE) {
+            console.log('🔧 DEVELOPMENT MODE ACTIVE');
+            console.log(`📊 ElevenLabs calls made: ${this.elevenLabsCallCount}`);
+            console.log(`🔇 ElevenLabs disabled: ${TalbotConfig.DISABLE_ELEVENLABS_IN_DEV}`);
+            console.log(`🎤 Default voice mode: ${TalbotConfig.DEV_VOICE_MODE} (0=mute, 1=female, 2=male)`);
+            console.log('💡 Use TalbotConfig.DEV_HELPERS.toggleDevMode() to toggle');
+        }
+    }
+
+    updateDevMode() {
+        // Called when dev mode is toggled
+        this.showDevModeStatus();
+        this.updateButtonVisibility();
+        this.updateVoiceIndicator();
+    }
+
     async checkElevenLabsAPI() {
+        // Skip API check in development mode if disabled
+        if (TalbotConfig.DEVELOPMENT_MODE && TalbotConfig.DISABLE_ELEVENLABS_IN_DEV) {
+            console.log('🔧 Dev mode: Skipping ElevenLabs API check');
+            this.elevenLabsAvailable = false;
+            this.updateButtonVisibility();
+            return;
+        }
+
         try {
             console.log('Checking ElevenLabs API availability...');
             
@@ -50,16 +79,14 @@ class SpeechManager {
                 
                 console.log('ElevenLabs API check result:', {
                     available: this.elevenLabsAvailable,
-                    hasApiKey: !!data.apiKey
+                    hasApiKey: !!data.apiKey,
+                    devMode: TalbotConfig.DEVELOPMENT_MODE
                 });
                 
                 // Update button visibility
                 this.updateButtonVisibility();
             } else {
                 console.error('ElevenLabs key check failed with status:', response.status);
-                const errorText = await response.text();
-                console.error('Error details:', errorText);
-                
                 this.elevenLabsAvailable = false;
                 this.updateButtonVisibility();
             }
@@ -73,17 +100,162 @@ class SpeechManager {
     updateButtonVisibility() {
         if (!this.voiceSettingsButton) return;
         
-        if (this.elevenLabsAvailable) {
+        // Show voice settings if ElevenLabs is available OR if we're in dev mode (for testing UI)
+        const shouldShow = this.elevenLabsAvailable || TalbotConfig.DEVELOPMENT_MODE;
+        
+        if (shouldShow) {
             this.voiceSettingsButton.style.display = 'block';
             this.updateVoiceIndicator();
         } else {
             this.voiceSettingsButton.style.display = 'none';
-            this.voiceMode = 0; // Force mute if ElevenLabs not available
+            this.voiceMode = 0; // Force mute if not available
         }
     }
 
+    // Enhanced speak method with development mode support
+    async speakMessage(text) {
+        if (!text || this.voiceMode === 0) {
+            console.log('Speech skipped - voice is muted or no text');
+            return;
+        }
+        
+        this.stopSpeaking();
+        const naturalText = this.makeTextMoreNatural(text);
+        
+        // Development mode logic - save credits!
+        if (TalbotConfig.DEVELOPMENT_MODE && TalbotConfig.DISABLE_ELEVENLABS_IN_DEV) {
+            console.log('🔧 Dev mode: Using browser voice to save ElevenLabs credits');
+            this.speakWithBrowser(naturalText);
+            return;
+        }
+        
+        // Text length check - save credits on long messages
+        if (naturalText.length > TalbotConfig.MAX_TEXT_LENGTH_FOR_ELEVENLABS) {
+            console.log(`💰 Text too long (${naturalText.length} chars), using browser voice to save credits`);
+            this.speakWithBrowser(naturalText);
+            return;
+        }
+        
+        // Use ElevenLabs if available and not in dev mode
+        if (this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE) {
+            console.log(`Using ElevenLabs ${this.voiceMode === 1 ? 'female' : 'male'} voice`);
+            await this.speakWithElevenLabs(naturalText);
+        } else {
+            console.log('Using browser voice');
+            this.speakWithBrowser(naturalText);
+        }
+    }
+
+    async speakWithElevenLabs(text) {
+        try {
+            // Track usage
+            this.elevenLabsCallCount++;
+            localStorage.setItem(TalbotConfig.SETTINGS.STORAGE_KEYS.ELEVENLABS_CALLS, this.elevenLabsCallCount.toString());
+            console.log(`💸 ElevenLabs API call #${this.elevenLabsCallCount}`);
+            
+            this.isSpeaking = true;
+            this.updateVoiceButton();
+            
+            const voiceType = this.voiceMode === 1 ? 'female' : 'male';
+            this.updateStatus(`Talbot is speaking... (${voiceType}) 💰`, '🗣️');
+
+            // Select voice ID based on mode
+            const selectedVoiceId = this.voiceMode === 1 ? this.femaleVoiceId : this.maleVoiceId;
+
+            const response = await fetch('/.netlify/functions/elevenlabs-tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    voice_id: selectedVoiceId,
+                    voice_settings: {
+                        stability: 0.75,
+                        similarity_boost: 0.85,
+                        style: 0.6,
+                        use_speaker_boost: true
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`ElevenLabs API error: ${response.status}`);
+            }
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            this.currentAudio = new Audio(audioUrl);
+            
+            this.currentAudio.onended = () => {
+                this.isSpeaking = false;
+                this.updateVoiceButton();
+                this.updateStatus('Ready to listen', '💙');
+                URL.revokeObjectURL(audioUrl);
+            };
+            
+            this.currentAudio.onerror = (error) => {
+                console.error('Audio playback error:', error);
+                this.isSpeaking = false;
+                this.updateVoiceButton();
+                this.updateStatus('Ready to listen', '💙');
+                URL.revokeObjectURL(audioUrl);
+            };
+            
+            await this.currentAudio.play();
+            
+        } catch (error) {
+            console.error('ElevenLabs TTS error:', error);
+            
+            // Show error and fallback
+            this.showVoiceStatus('Premium voice failed, using backup', false);
+            this.speakWithBrowser(text);
+        }
+    }
+
+    speakWithBrowser(text) {
+        if (!this.synthesis) return;
+        
+        console.log('🆓 Using free browser voice');
+        
+        this.currentUtterance = new SpeechSynthesisUtterance(text);
+        
+        this.currentUtterance.rate = 0.85;
+        this.currentUtterance.pitch = 1.1;
+        this.currentUtterance.volume = 0.9;
+        
+        if (this.bestVoice) {
+            this.currentUtterance.voice = this.bestVoice;
+        }
+        
+        this.currentUtterance.onstart = () => {
+            this.isSpeaking = true;
+            this.updateVoiceButton();
+            const devIndicator = TalbotConfig.DEVELOPMENT_MODE ? ' 🔧' : '';
+            this.updateStatus(`Talbot is speaking...${devIndicator}`, '🗣️');
+        };
+        
+        this.currentUtterance.onend = () => {
+            this.isSpeaking = false;
+            this.updateVoiceButton();
+            this.updateStatus('Ready to listen', '💙');
+        };
+        
+        this.currentUtterance.onerror = (event) => {
+            console.error('Speech synthesis error:', event);
+            this.isSpeaking = false;
+            this.updateVoiceButton();
+            this.updateStatus('Ready to listen', '💙');
+        };
+        
+        setTimeout(() => {
+            this.synthesis.speak(this.currentUtterance);
+        }, 100);
+    }
+
     toggleVoiceSettings() {
-        if (!this.elevenLabsAvailable) return;
+        if (!this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE) return;
         
         this.voiceSettingsExpanded = !this.voiceSettingsExpanded;
         
@@ -125,11 +297,15 @@ class SpeechManager {
             const saved = localStorage.getItem('talbot-voice-mode');
             if (saved !== null) {
                 this.voiceMode = parseInt(saved, 10);
-                if (this.voiceRange) {
-                    this.voiceRange.value = this.voiceMode;
-                }
-                this.updateVoiceIndicator();
+            } else if (TalbotConfig.DEVELOPMENT_MODE) {
+                // Use dev default if no saved preference
+                this.voiceMode = TalbotConfig.DEV_VOICE_MODE;
             }
+            
+            if (this.voiceRange) {
+                this.voiceRange.value = this.voiceMode;
+            }
+            this.updateVoiceIndicator();
         } catch (error) {
             console.error('Error loading voice preference:', error);
         }
@@ -147,9 +323,12 @@ class SpeechManager {
         if (!this.voiceIndicator) return;
         
         const labels = ['Mute', 'Female', 'Male'];
-        this.voiceIndicator.textContent = labels[this.voiceMode] || 'Mute';
+        const label = labels[this.voiceMode] || 'Mute';
+        const devIndicator = TalbotConfig.DEVELOPMENT_MODE ? ' 🔧' : '';
         
-        console.log('Voice mode updated to:', labels[this.voiceMode]);
+        this.voiceIndicator.textContent = label + devIndicator;
+        
+        console.log('Voice mode updated to:', label);
     }
 
     initializeSpeech() {
@@ -257,7 +436,9 @@ class SpeechManager {
                     1: 'Female voice selected',
                     2: 'Male voice selected'
                 };
-                this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
+                
+                const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode - saving credits!)' : '';
+                this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
             });
         }
 
@@ -336,127 +517,6 @@ class SpeechManager {
             this.updateVoiceButton();
             this.updateStatus('Ready to listen', '💙');
         }
-    }
-
-    // Enhanced speak method with voice mode support
-    async speakMessage(text) {
-        if (!text || this.voiceMode === 0) {
-            console.log('Speech skipped - voice is muted or no text');
-            return; // Skip if muted or no text
-        }
-        
-        this.stopSpeaking();
-        
-        const naturalText = this.makeTextMoreNatural(text);
-        
-        // Use ElevenLabs if available, otherwise fall back to browser TTS
-        if (this.elevenLabsAvailable) {
-            console.log(`Using ElevenLabs ${this.voiceMode === 1 ? 'female' : 'male'} voice`);
-            await this.speakWithElevenLabs(naturalText);
-        } else {
-            console.log('Using browser voice');
-            this.speakWithBrowser(naturalText);
-        }
-    }
-
-    async speakWithElevenLabs(text) {
-        try {
-            this.isSpeaking = true;
-            this.updateVoiceButton();
-            
-            const voiceType = this.voiceMode === 1 ? 'female' : 'male';
-            this.updateStatus(`Talbot is speaking... (${voiceType})`, '🗣️');
-
-            // Select voice ID based on mode
-            const selectedVoiceId = this.voiceMode === 1 ? this.femaleVoiceId : this.maleVoiceId;
-
-            const response = await fetch('/.netlify/functions/elevenlabs-tts', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    text: text,
-                    voice_id: selectedVoiceId,
-                    voice_settings: {
-                        stability: 0.75,
-                        similarity_boost: 0.85,
-                        style: 0.6,
-                        use_speaker_boost: true
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`ElevenLabs API error: ${response.status}`);
-            }
-
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            this.currentAudio = new Audio(audioUrl);
-            
-            this.currentAudio.onended = () => {
-                this.isSpeaking = false;
-                this.updateVoiceButton();
-                this.updateStatus('Ready to listen', '💙');
-                URL.revokeObjectURL(audioUrl);
-            };
-            
-            this.currentAudio.onerror = (error) => {
-                console.error('Audio playback error:', error);
-                this.isSpeaking = false;
-                this.updateVoiceButton();
-                this.updateStatus('Ready to listen', '💙');
-                URL.revokeObjectURL(audioUrl);
-            };
-            
-            await this.currentAudio.play();
-            
-        } catch (error) {
-            console.error('ElevenLabs TTS error:', error);
-            
-            // Show error and fallback
-            this.showVoiceStatus('Premium voice failed, using backup', false);
-            this.speakWithBrowser(text);
-        }
-    }
-
-    speakWithBrowser(text) {
-        if (!this.synthesis) return;
-        
-        this.currentUtterance = new SpeechSynthesisUtterance(text);
-        
-        this.currentUtterance.rate = 0.85;
-        this.currentUtterance.pitch = 1.1;
-        this.currentUtterance.volume = 0.9;
-        
-        if (this.bestVoice) {
-            this.currentUtterance.voice = this.bestVoice;
-        }
-        
-        this.currentUtterance.onstart = () => {
-            this.isSpeaking = true;
-            this.updateVoiceButton();
-            this.updateStatus('Talbot is speaking...', '🗣️');
-        };
-        
-        this.currentUtterance.onend = () => {
-            this.isSpeaking = false;
-            this.updateVoiceButton();
-            this.updateStatus('Ready to listen', '💙');
-        };
-        
-        this.currentUtterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event);
-            this.isSpeaking = false;
-            this.updateVoiceButton();
-            this.updateStatus('Ready to listen', '💙');
-        };
-        
-        setTimeout(() => {
-            this.synthesis.speak(this.currentUtterance);
-        }, 100);
     }
 
     makeTextMoreNatural(text) {
@@ -575,9 +635,17 @@ class SpeechManager {
         return this.elevenLabsAvailable;
     }
 
+    getUsageStats() {
+        return {
+            totalCalls: this.elevenLabsCallCount,
+            devMode: TalbotConfig.DEVELOPMENT_MODE,
+            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV
+        };
+    }
+
     // Legacy compatibility methods (for existing code)
     getIsPremiumVoiceEnabled() {
-        return this.voiceMode > 0 && this.elevenLabsAvailable;
+        return this.voiceMode > 0 && this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE;
     }
 
     togglePremiumVoice() {
@@ -594,6 +662,8 @@ class SpeechManager {
             1: 'Female voice selected',
             2: 'Male voice selected'
         };
-        this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
+        
+        const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
+        this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
     }
 }
