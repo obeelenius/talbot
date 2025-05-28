@@ -34,7 +34,7 @@ class SpeechManager {
 
     async checkElevenLabsAPI() {
         try {
-            const response = await fetch('/.netlify/functions/get-elevenlabs-key');
+            const response = await fetch('/.netlify/functions/elevenlabs-key');
             if (response.ok) {
                 const data = await response.json();
                 this.elevenLabsAvailable = data.available;
