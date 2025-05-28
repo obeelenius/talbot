@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Talbot - Your Mental Health Companion</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#8B3A3A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Talbot">
+    <meta name="description" content="Your personal mental health assistant for support between therapy sessions">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
+    
+    <!-- Android Chrome Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Google Fonts - Lora -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- Voice Toggle Button (left side) -->
+            <div class="voice-toggle-container">
+                <button class="voice-toggle" id="voice-toggle" title="Toggle premium voice">
+                    <span class="toggle-icon" id="toggle-icon">🔊</span>
+                    <span class="toggle-text" id="toggle-text">Basic Voice</span>
+                </button>
+            </div>
+            
+            <!-- Center content -->
+            <h1>Talbot</h1>
+            <p class="header-subtitle">Your Mental Health Companion</p>
+            
+            <!-- Profile button (right side) -->
+            <button class="profile-button" id="profile-button">Profile</button>
+            
+            <!-- Status (bottom center) -->
+            <div class="status">
+                <span id="status-text">Talk to me, I'm here</span>
+                <span id="status-indicator">🖤</span>
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="welcome-message">
+                    <h2>Hi, I'm Talbot</h2>
+                    <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="message-avatar">
+                    <span>t</span>
+                </div>
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <button class="action-button voice-button" id="voice-button" title="Hold to speak">
+                🎤
+            </button>
+            <div class="input-group">
+                <textarea 
+                    class="message-input" 
+                    id="message-input" 
+                    placeholder="What's on your mind? Type or hold the mic to speak..."
+                    rows="1"
+                ></textarea>
+            </div>
+            <button class="action-button send-button" id="send-button" title="Send message">
+                ➤
+            </button>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="profile-modal" id="profile-modal">
+        <div class="profile-content">
+            <div class="profile-header">
+                <h2>Your Profile</h2>
+                <button class="close-button" id="close-profile">×</button>
+            </div>
+            <form class="profile-form" id="profile-form">
+                <!-- Profile Photo Section -->
+                <div class="form-section">
+                    <h3>Profile Photo</h3>
+                    <div class="profile-photo-section">
+                        <div class="profile-photo-upload">
+                            <div class="profile-photo-preview" id="profile-photo-preview">
+                                📷
+                            </div>
+                            <input type="file" id="profile-photo-input" class="profile-photo-input" accept="image/*">
+                        </div>
+                        <label class="profile-photo-label">Click to upload your profile photo</label>
+                    </div>
+                </div>
+
+                <!-- Personal Information -->
+                <div class="form-section">
+                    <h3>Personal Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="preferred-name">Preferred Name</label>
+                            <input type="text" id="preferred-name" name="preferredName" placeholder="What should Talbot call you?">
+                        </div>
+                        <div class="form-group">
+                            <label for="age-range">Age Range</label>
+                            <select id="age-range" name="ageRange">
+                                <option value="">Select age range</option>
+                                <option value="18-25">18-25</option>
+                                <option value="26-35">26-35</option>
+                                <option value="36-45">36-45</option>
+                                <option value="46-55">46-55</option>
+                                <option value="56-65">56-65</option>
+                                <option value="65+">65+</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="pronouns">Pronouns</label>
+                        <input type="text" id="pronouns" name="pronouns" placeholder="e.g., she/her, he/him, they/them">
+                    </div>
+                </div>
+
+                <!-- Mental Health Information -->
+                <div class="form-section">
+                    <h3>Mental Health Information</h3>
+                    <div class="form-group">
+                        <label for="diagnoses">Current Diagnoses</label>
+                        <textarea id="diagnoses" name="diagnoses" placeholder="e.g., BPD, ADHD-PI, OCD, PTSD, Depression, Anxiety, etc."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="clinical-documents">Clinical Documents</label>
+                        <p class="form-help">Upload diagnostic reports, treatment notes, or other clinical documents that help Talbot understand your conditions better. These stay private on your device.</p>
+                        <input type="file" id="clinical-documents" name="clinicalDocuments" multiple accept=".pdf,.txt,.doc,.docx" class="file-input">
+                        <div class="uploaded-files" id="uploaded-files"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="medications">Current Medications</label>
+                        <textarea id="medications" name="medications" placeholder="List your current medications and dosages (if comfortable sharing)"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="treatment-history">Treatment History</label>
+                        <textarea id="treatment-history" name="treatmentHistory" placeholder="Types of therapy (CBT, DBT, etc.), what's worked, what hasn't, current therapist info, etc."></textarea>
+                    </div>
+                </div>
+
+                <!-- Communication Preferences -->
+                <div class="form-section">
+                    <h3>Communication Preferences</h3>
+                    <div class="form-group">
+                        <label>How would you like Talbot to communicate with you?</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="gentle" name="communicationStyle" value="gentle">
+                                <label for="gentle">Gentle & Soft</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="direct" name="communicationStyle" value="direct">
+                                <label for="direct">Direct & Clear</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="encouraging" name="communicationStyle" value="encouraging">
+                                <label for="encouraging">Encouraging</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="probing" name="communicationStyle" value="probing">
+                                <label for="probing">Ask Probing Questions</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="validating" name="communicationStyle" value="validating">
+                                <label for="validating">Validating</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="warm" name="communicationStyle" value="warm">
+                                <label for="warm">Warm & Empathetic</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="custom-communication">Custom Communication Preferences</label>
+                        <textarea id="custom-communication" name="customCommunication" placeholder="Describe how you'd like Talbot to communicate. For example: 'Ask probing questions like my therapist does', 'Use validation before offering suggestions', 'Keep responses concise', 'Challenge my thinking patterns', etc."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="triggers">Topics to Approach Carefully</label>
+                        <textarea id="triggers" name="triggers" placeholder="Any topics, words, or subjects that might be triggering or sensitive for you"></textarea>
+                    </div>
+                </div>
+
+                <!-- Current Focus Areas -->
+                <div class="form-section">
+                    <h3>Current Focus Areas</h3>
+                    <div class="form-group">
+                        <label for="therapy-goals">Current Therapy Goals</label>
+                        <textarea id="therapy-goals" name="therapyGoals" placeholder="What are you working on in therapy right now?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="coping-strategies">Coping Strategies That Work</label>
+                        <textarea id="coping-strategies" name="copingStrategies" placeholder="What techniques, activities, or strategies help you feel better?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="current-stressors">Current Life Stressors</label>
+                        <textarea id="current-stressors" name="currentStressors" placeholder="What's causing stress or difficulty in your life right now?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="therapist-info">Therapist Information</label>
+                        <textarea id="therapist-info" name="therapistInfo" placeholder="Your therapist's name, their approach, things they focus on with you, etc. (helps Talbot complement your therapy)"></textarea>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="profile-actions">
+                    <button type="button" class="btn btn-danger" id="clear-profile">Clear All Data</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-profile">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modular Scripts -->
+    <script src="talbot-config.js"></script>
+    <script src="profile-manager.js"></script>
+    <script src="speech-manager.js"></script>
+    <script src="ai-response-manager.js"></script>
+    <script src="ui-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
