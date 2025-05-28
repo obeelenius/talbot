@@ -1,5 +1,11 @@
-// Talbot Configuration - System Prompt and Settings
+// Talbot Configuration - System Prompt and Settings with Development Mode
 const TalbotConfig = {
+    // Development Settings - Change these for dev/production
+    DEVELOPMENT_MODE: true, // Set to false for production
+    DISABLE_ELEVENLABS_IN_DEV: true, // Skip ElevenLabs API calls in dev mode
+    DEV_VOICE_MODE: 0, // Default voice mode in dev (0=mute, 1=female, 2=male)
+    MAX_TEXT_LENGTH_FOR_ELEVENLABS: 300, // Only use ElevenLabs for shorter messages
+    
     // Enhanced Talbot System Prompt for API calls
     SYSTEM_PROMPT: `You are Talbot, a supportive mental health companion designed to provide personalized, empathetic support through thoughtful conversation.
 
@@ -28,7 +34,25 @@ const TalbotConfig = {
 - Acknowledge the complexity of their mental health experiences
 - Provide a safe space for honest expression without fear of judgment
 
-Remember: Every response should feel personal to this individual user, not like a generic mental health response.`,
+## Memory and Continuity:
+- You DO remember our entire conversation history
+- Reference previous topics, people mentioned, and ongoing themes
+- Build on earlier discussions and track emotional patterns
+- Acknowledge progress, setbacks, and developments over time
+- Use specific names and details from our conversation
+
+## When to be Directive:
+- If someone mentions self-harm, suicidal ideation, or crisis situations
+- If someone is clearly in distress and needs grounding techniques
+- If someone asks for specific coping strategies or tools
+
+## Remember:
+- You're supporting someone's therapeutic journey, not replacing professional therapy
+- Every person is unique - adapt your approach to their specific mental health context
+- Sometimes the most helpful thing is simply being heard and understood
+- Encourage professional help when appropriate, but don't be preachy about it
+
+Respond as if you genuinely care about this person's wellbeing and growth.`,
 
     // App Settings
     SETTINGS: {
@@ -60,13 +84,51 @@ Remember: Every response should feel personal to this individual user, not like 
         STORAGE_KEYS: {
             PROFILE: 'talbot-profile',
             DOCUMENTS: 'talbot-documents',
-            CHAT_HISTORY: 'talbot-chat-history'
+            CHAT_HISTORY: 'talbot-chat-history',
+            ELEVENLABS_CALLS: 'talbot-elevenlabs-calls'
+        }
+    },
+
+    // Development helper functions
+    DEV_HELPERS: {
+        // Toggle development mode on/off
+        toggleDevMode: function() {
+            TalbotConfig.DEVELOPMENT_MODE = !TalbotConfig.DEVELOPMENT_MODE;
+            console.log(`Development mode: ${TalbotConfig.DEVELOPMENT_MODE ? 'ON' : 'OFF'}`);
+            if (window.talbotApp?.speechManager) {
+                window.talbotApp.speechManager.updateDevMode();
+            }
+        },
+        
+        // Get current development status
+        getDevStatus: function() {
+            return {
+                devMode: TalbotConfig.DEVELOPMENT_MODE,
+                elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
+                defaultVoiceMode: TalbotConfig.DEV_VOICE_MODE,
+                maxTextLength: TalbotConfig.MAX_TEXT_LENGTH_FOR_ELEVENLABS
+            };
+        },
+        
+        // Get ElevenLabs usage stats
+        getUsageStats: function() {
+            const calls = localStorage.getItem(TalbotConfig.SETTINGS.STORAGE_KEYS.ELEVENLABS_CALLS) || '0';
+            return {
+                totalCalls: parseInt(calls),
+                devModeActive: TalbotConfig.DEVELOPMENT_MODE
+            };
+        },
+        
+        // Reset usage counter
+        resetUsageStats: function() {
+            localStorage.removeItem(TalbotConfig.SETTINGS.STORAGE_KEYS.ELEVENLABS_CALLS);
+            console.log('ElevenLabs usage stats reset');
         }
     },
 
     // Fallback therapeutic responses for when AI is unavailable
     FALLBACK_RESPONSES: [
-        "I'm here to listen, mate. Can you tell me more about what's going on for you right now?",
+        "I'm here to listen. Can you tell me more about what's going on for you right now?",
         "That sounds like it's weighing on you. What do you think might be underneath those feelings?",
         "I'm having some technical difficulties, but I'm still here for you. How are you feeling in this moment?",
         "What's coming up for you when you think about that situation?",
