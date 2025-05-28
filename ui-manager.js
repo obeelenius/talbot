@@ -1,4 +1,4 @@
-// UI Manager with Profile Photo Support and Talbot Avatar - Fixed Duplication
+// UI Manager with Profile Photo Support and Talbot Avatar - Fixed Display Issue
 class UIManager {
     constructor() {
         this.messages = [];
@@ -52,69 +52,75 @@ class UIManager {
         });
     }
 
-    // Enhanced addMessage with profile photo support and Talbot avatar - Fixed duplication
+    // Enhanced addMessage with profile photo support and Talbot avatar - Fixed display
     addMessage(sender, content) {
-        // Prevent adding empty messages or duplicate processing
-        if (!content || !content.trim() || this.isProcessingMessage) {
+        // Validate input
+        if (!content || typeof content !== 'string' || !content.trim()) {
+            console.log('Invalid message content, skipping');
             return;
         }
 
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${sender}`;
-        
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        
-        // Handle avatars for different senders
-        if (sender === 'user' && window.talbotApp?.profileManager) {
-            const userAvatar = window.talbotApp.profileManager.getUserAvatar();
-            avatar.innerHTML = userAvatar;
-        } else if (sender === 'assistant') {
-            // Use Talbot favicon for assistant messages
-            avatar.innerHTML = '<img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">';
-        } else {
-            // Fallback avatars
-            avatar.innerHTML = sender === 'user' ? '👤' : '🤖';
-        }
-        
-        const messageContent = document.createElement('div');
-        messageContent.className = 'message-content';
-        messageContent.textContent = content.trim();
-        
-        // Add timestamp
-        const messageTime = document.createElement('div');
-        messageTime.className = 'message-time';
-        messageTime.textContent = this.formatTime(new Date());
-        
-        messageDiv.appendChild(avatar);
-        messageDiv.appendChild(messageContent);
-        messageContent.appendChild(messageTime);
-        
-        // Remove welcome message if it exists
-        const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
-        if (welcomeMessage) {
-            welcomeMessage.remove();
-        }
-        
-        this.messagesContainer.appendChild(messageDiv);
-        this.scrollToBottom();
-        
-        // Store message with deduplication check
-        const messageData = { 
-            sender, 
-            content: content.trim(), 
-            timestamp: new Date() 
-        };
-        
-        // Check if this exact message was just added (prevent duplicates)
-        const lastMessage = this.messages[this.messages.length - 1];
-        if (!lastMessage || 
-            lastMessage.sender !== messageData.sender || 
-            lastMessage.content !== messageData.content ||
-            (new Date() - new Date(lastMessage.timestamp)) > 1000) { // 1 second gap minimum
+        const trimmedContent = content.trim();
+        console.log(`Adding ${sender} message:`, trimmedContent);
+
+        try {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            
+            // Handle avatars for different senders
+            if (sender === 'user' && window.talbotApp?.profileManager) {
+                const userAvatar = window.talbotApp.profileManager.getUserAvatar();
+                avatar.innerHTML = userAvatar;
+            } else if (sender === 'assistant') {
+                // Use Talbot favicon for assistant messages
+                avatar.innerHTML = '<img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">';
+            } else {
+                // Fallback avatars
+                avatar.innerHTML = sender === 'user' ? '👤' : '🤖';
+            }
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = trimmedContent;
+            
+            // Add timestamp
+            const messageTime = document.createElement('div');
+            messageTime.className = 'message-time';
+            messageTime.textContent = this.formatTime(new Date());
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            messageContent.appendChild(messageTime);
+            
+            // Remove welcome message if it exists
+            const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            // Add to DOM
+            this.messagesContainer.appendChild(messageDiv);
+            console.log('Message added to DOM successfully');
+            
+            this.scrollToBottom();
+            
+            // Store message - simplified logic
+            const messageData = { 
+                sender, 
+                content: trimmedContent, 
+                timestamp: new Date() 
+            };
             
             this.messages.push(messageData);
             this.saveChatHistory();
+            
+            console.log(`Total messages now: ${this.messages.length}`);
+            
+        } catch (error) {
+            console.error('Error adding message:', error);
         }
     }
 
@@ -126,11 +132,14 @@ class UIManager {
     }
 
     clearMessageInput() {
-        this.messageInput.value = '';
-        this.messageInput.style.height = 'auto';
+        if (this.messageInput) {
+            this.messageInput.value = '';
+            this.messageInput.style.height = 'auto';
+        }
     }
 
     getMessageInput() {
+        if (!this.messageInput) return '';
         const message = this.messageInput.value.trim();
         return message;
     }
@@ -145,19 +154,25 @@ class UIManager {
 
     // Typing Indicator
     showTyping() {
-        this.typingIndicator.style.display = 'flex';
-        this.scrollToBottom();
+        if (this.typingIndicator) {
+            this.typingIndicator.style.display = 'flex';
+            this.scrollToBottom();
+        }
     }
 
     hideTyping() {
-        this.typingIndicator.style.display = 'none';
+        if (this.typingIndicator) {
+            this.typingIndicator.style.display = 'none';
+        }
     }
 
     // Scrolling
     scrollToBottom() {
-        setTimeout(() => {
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        }, 100);
+        if (this.messagesContainer) {
+            setTimeout(() => {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }, 50);
+        }
     }
 
     // Status Messages
@@ -175,13 +190,15 @@ class UIManager {
         messageDiv.textContent = text;
         
         const chatContainer = document.querySelector('.chat-container');
-        chatContainer.insertBefore(messageDiv, this.messagesContainer);
-        
-        setTimeout(() => {
-            if (messageDiv.parentNode) {
-                messageDiv.remove();
-            }
-        }, 5000);
+        if (chatContainer && this.messagesContainer) {
+            chatContainer.insertBefore(messageDiv, this.messagesContainer);
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
     }
 
     // Chat History Management
@@ -200,6 +217,7 @@ class UIManager {
             if (savedHistory) {
                 this.messages = JSON.parse(savedHistory);
                 this.displayChatHistory();
+                console.log(`Loaded ${this.messages.length} messages from history`);
             }
         } catch (error) {
             console.error('Error loading chat history:', error);
@@ -207,6 +225,8 @@ class UIManager {
     }
 
     displayChatHistory() {
+        if (!this.messagesContainer) return;
+        
         const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
         if (welcomeMessage && this.messages.length > 0) {
             welcomeMessage.remove();
@@ -220,6 +240,8 @@ class UIManager {
     }
 
     displayHistoryMessage(message) {
+        if (!this.messagesContainer) return;
+        
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender}`;
         
@@ -258,12 +280,14 @@ class UIManager {
             this.messages = [];
             localStorage.removeItem('talbot-chat-history');
             
-            this.messagesContainer.innerHTML = `
-                <div class="welcome-message">
-                    <h2>Hi, I'm Talbot</h2>
-                    <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
-                </div>
-            `;
+            if (this.messagesContainer) {
+                this.messagesContainer.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>Hi, I'm Talbot</h2>
+                        <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
+                    </div>
+                `;
+            }
             
             this.showSuccess('Chat history cleared successfully.');
         }
@@ -271,20 +295,28 @@ class UIManager {
 
     // Focus management
     focusMessageInput() {
-        this.messageInput.focus();
+        if (this.messageInput) {
+            this.messageInput.focus();
+        }
     }
 
     blurMessageInput() {
-        this.messageInput.blur();
+        if (this.messageInput) {
+            this.messageInput.blur();
+        }
     }
 
     // Button state management
     disableSendButton() {
-        this.sendButton.disabled = true;
+        if (this.sendButton) {
+            this.sendButton.disabled = true;
+        }
     }
 
     enableSendButton() {
-        this.sendButton.disabled = false;
+        if (this.sendButton) {
+            this.sendButton.disabled = false;
+        }
     }
 
     // Export chat functionality
@@ -329,6 +361,13 @@ class UIManager {
         return this.messages.length > 0;
     }
 
+    // Debug method
+    debugMessages() {
+        console.log('Current messages:', this.messages);
+        console.log('Messages container:', this.messagesContainer);
+        console.log('Visible message elements:', this.messagesContainer?.children.length || 0);
+    }
+
     // Responsive design helpers
     isMobile() {
         return window.innerWidth <= 768;
@@ -336,7 +375,9 @@ class UIManager {
 
     adjustForMobile() {
         if (this.isMobile()) {
-            this.messageInput.style.fontSize = '16px';
+            if (this.messageInput) {
+                this.messageInput.style.fontSize = '16px';
+            }
         }
     }
 
