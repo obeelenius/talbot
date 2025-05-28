@@ -1,7 +1,8 @@
-// UI Manager with Profile Photo Support and Talbot Avatar
+// UI Manager with Profile Photo Support and Talbot Avatar - Fixed Duplication
 class UIManager {
     constructor() {
         this.messages = [];
+        this.isProcessingMessage = false; // Prevent duplicate processing
         this.initializeElements();
         this.bindEvents();
         this.setupViewportHeight();
@@ -15,12 +16,17 @@ class UIManager {
     }
 
     bindEvents() {
-        // Send button
-        this.sendButton.addEventListener('click', () => this.onSendMessage?.());
+        // Send button - prevent double clicks
+        this.sendButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!this.isProcessingMessage) {
+                this.onSendMessage?.();
+            }
+        });
         
-        // Enter key to send (shift+enter for new line)
+        // Enter key to send (shift+enter for new line) - prevent double submission
         this.messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !this.isProcessingMessage) {
                 e.preventDefault();
                 this.onSendMessage?.();
             }
@@ -46,8 +52,13 @@ class UIManager {
         });
     }
 
-    // Enhanced addMessage with profile photo support and Talbot avatar
+    // Enhanced addMessage with profile photo support and Talbot avatar - Fixed duplication
     addMessage(sender, content) {
+        // Prevent adding empty messages or duplicate processing
+        if (!content || !content.trim() || this.isProcessingMessage) {
+            return;
+        }
+
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
         
@@ -68,7 +79,7 @@ class UIManager {
         
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        messageContent.textContent = content;
+        messageContent.textContent = content.trim();
         
         // Add timestamp
         const messageTime = document.createElement('div');
@@ -88,15 +99,23 @@ class UIManager {
         this.messagesContainer.appendChild(messageDiv);
         this.scrollToBottom();
         
-        // Store message
-        this.messages.push({ 
+        // Store message with deduplication check
+        const messageData = { 
             sender, 
-            content, 
+            content: content.trim(), 
             timestamp: new Date() 
-        });
+        };
         
-        // Save to localStorage
-        this.saveChatHistory();
+        // Check if this exact message was just added (prevent duplicates)
+        const lastMessage = this.messages[this.messages.length - 1];
+        if (!lastMessage || 
+            lastMessage.sender !== messageData.sender || 
+            lastMessage.content !== messageData.content ||
+            (new Date() - new Date(lastMessage.timestamp)) > 1000) { // 1 second gap minimum
+            
+            this.messages.push(messageData);
+            this.saveChatHistory();
+        }
     }
 
     formatTime(date) {
@@ -112,7 +131,16 @@ class UIManager {
     }
 
     getMessageInput() {
-        return this.messageInput.value.trim();
+        const message = this.messageInput.value.trim();
+        return message;
+    }
+
+    // Set processing state to prevent duplicates
+    setProcessingState(isProcessing) {
+        this.isProcessingMessage = isProcessing;
+        if (this.sendButton) {
+            this.sendButton.disabled = isProcessing;
+        }
     }
 
     // Typing Indicator
