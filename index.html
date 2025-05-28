@@ -46,34 +46,22 @@
 <body>
     <div class="container">
         <div class="header">
-            <!-- Left side - Logo and subtitle -->
-            <div class="header-content">
-                <h1>Talbot</h1>
-                <p class="header-subtitle">Your Mental Health Companion</p>
+            <!-- Voice Toggle Button (left side) -->
+            <div class="voice-toggle-container">
+                <button class="voice-toggle" id="voice-toggle" title="Toggle premium voice">
+                    <span class="toggle-icon" id="toggle-icon">🔊</span>
+                    <span class="toggle-text" id="toggle-text">Basic Voice</span>
+                </button>
             </div>
             
-            <!-- Right side - Profile and Voice Controls -->
-            <div class="header-controls">
-                <button class="profile-button" id="profile-button">Profile</button>
-                
-                <!-- Voice Settings Button (collapsible) -->
-                <button class="voice-settings-button" id="voice-settings-button">Voice Settings</button>
-                
-                <!-- Voice Slider (collapsible) -->
-                <div class="voice-slider-container" id="voice-slider-container">
-                    <div class="voice-slider" id="voice-slider">
-                        <input type="range" min="0" max="2" value="0" step="1" class="slider" id="voice-range">
-                        <div class="slider-labels">
-                            <span class="slider-label">Mute</span>
-                            <span class="slider-label">Female</span>
-                            <span class="slider-label">Male</span>
-                        </div>
-                        <div class="slider-indicator" id="voice-indicator">Mute</div>
-                    </div>
-                </div>
-            </div>
+            <!-- Center content -->
+            <h1>Talbot</h1>
+            <p class="header-subtitle">Your Mental Health Companion</p>
             
-            <!-- Status (centered at bottom) -->
+            <!-- Profile button (right side) -->
+            <button class="profile-button" id="profile-button">Profile</button>
+            
+            <!-- Status (bottom center) -->
             <div class="status">
                 <span id="status-text">Talk to me, I'm here</span>
                 <span id="status-indicator">🖤</span>
@@ -90,7 +78,7 @@
             
             <div class="typing-indicator" id="typing-indicator">
                 <div class="message-avatar">
-                    <img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">
+                    <span>t</span>
                 </div>
                 <div class="typing-dots">
                     <div class="typing-dot"></div>
