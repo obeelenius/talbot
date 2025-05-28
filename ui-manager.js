@@ -1,4 +1,4 @@
-// UI Manager with Profile Photo Support
+// UI Manager with Profile Photo Support and Talbot Avatar
 class UIManager {
     constructor() {
         this.messages = [];
@@ -46,7 +46,7 @@ class UIManager {
         });
     }
 
-    // Enhanced addMessage with profile photo support
+    // Enhanced addMessage with profile photo support and Talbot avatar
     addMessage(sender, content) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
@@ -54,11 +54,15 @@ class UIManager {
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
         
-        // Use profile photo for user messages if available
+        // Handle avatars for different senders
         if (sender === 'user' && window.talbotApp?.profileManager) {
             const userAvatar = window.talbotApp.profileManager.getUserAvatar();
             avatar.innerHTML = userAvatar;
+        } else if (sender === 'assistant') {
+            // Use Talbot favicon for assistant messages
+            avatar.innerHTML = '<img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">';
         } else {
+            // Fallback avatars
             avatar.innerHTML = sender === 'user' ? '👤' : '🤖';
         }
         
@@ -194,11 +198,15 @@ class UIManager {
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
         
-        // Use profile photo for historical user messages if available
+        // Handle avatars for historical messages
         if (message.sender === 'user' && window.talbotApp?.profileManager) {
             const userAvatar = window.talbotApp.profileManager.getUserAvatar();
             avatar.innerHTML = userAvatar;
+        } else if (message.sender === 'assistant') {
+            // Use Talbot favicon for assistant messages
+            avatar.innerHTML = '<img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">';
         } else {
+            // Fallback avatars
             avatar.innerHTML = message.sender === 'user' ? '👤' : '🤖';
         }
         
