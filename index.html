@@ -46,20 +46,28 @@
 <body>
     <div class="container">
         <div class="header">
-            <!-- Voice Toggle Button (left side) -->
-            <div class="voice-toggle-container">
-                <button class="voice-toggle" id="voice-toggle" title="Toggle premium voice">
-                    <span class="toggle-icon" id="toggle-icon">🔊</span>
-                    <span class="toggle-text" id="toggle-text">Basic Voice</span>
-                </button>
-            </div>
-            
             <!-- Center content -->
             <h1>Talbot</h1>
             <p class="header-subtitle">Your Mental Health Companion</p>
             
-            <!-- Profile button (right side) -->
-            <button class="profile-button" id="profile-button">Profile</button>
+            <!-- Profile and Voice Controls (right side) -->
+            <div class="header-controls">
+                <button class="profile-button" id="profile-button">Profile</button>
+                
+                <!-- Voice Slider -->
+                <div class="voice-slider-container" id="voice-slider-container">
+                    <label class="voice-slider-label">Voice</label>
+                    <div class="voice-slider" id="voice-slider">
+                        <input type="range" min="0" max="2" value="0" step="1" class="slider" id="voice-range">
+                        <div class="slider-labels">
+                            <span class="slider-label">Mute</span>
+                            <span class="slider-label">Female</span>
+                            <span class="slider-label">Male</span>
+                        </div>
+                        <div class="slider-indicator" id="voice-indicator">Mute</div>
+                    </div>
+                </div>
+            </div>
             
             <!-- Status (bottom center) -->
             <div class="status">
@@ -78,7 +86,7 @@
             
             <div class="typing-indicator" id="typing-indicator">
                 <div class="message-avatar">
-                    <span>t</span>
+                    <img src="/favicon-32x32.png" alt="Talbot" class="talbot-avatar">
                 </div>
                 <div class="typing-dots">
                     <div class="typing-dot"></div>
