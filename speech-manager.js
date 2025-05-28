@@ -1,4 +1,4 @@
-// Enhanced Speech Manager with Voice Slider (Mute, Female, Male)
+// Enhanced Speech Manager with Collapsible Voice Settings
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -13,10 +13,9 @@ class SpeechManager {
         this.voiceMode = 0; // Default to mute
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.femaleVoiceId = 'mFgXOmlOfXfr6suoQkRH'; // Frances - Female voice, Irish
-        // 'mFgXOmlOfXfr6suoQkRH'; // Frances - Female voice, Irish
-        // 'uhYnkYTBc711oAY590Ea'; // Charlotte - Female voice
+        this.femaleVoiceId = 'mFgXOmlOfXfr6suoQkRH'; // Frances - Female voice
         this.maleVoiceId = 'G0yjIg3xY8gEJZkHpjVm'; // Brian - Male voice
+        this.voiceSettingsExpanded = false; // Track expansion state
         
         this.initializeElements();
         this.initializeSpeech();
@@ -30,6 +29,7 @@ class SpeechManager {
         this.statusText = document.getElementById('status-text');
         this.statusIndicator = document.getElementById('status-indicator');
         this.messageInput = document.getElementById('message-input');
+        this.voiceSettingsButton = document.getElementById('voice-settings-button');
         this.voiceSliderContainer = document.getElementById('voice-slider-container');
         this.voiceRange = document.getElementById('voice-range');
         this.voiceIndicator = document.getElementById('voice-indicator');
@@ -53,33 +53,71 @@ class SpeechManager {
                     hasApiKey: !!data.apiKey
                 });
                 
-                // Update slider visibility
-                this.updateSliderVisibility();
+                // Update button visibility
+                this.updateButtonVisibility();
             } else {
                 console.error('ElevenLabs key check failed with status:', response.status);
                 const errorText = await response.text();
                 console.error('Error details:', errorText);
                 
                 this.elevenLabsAvailable = false;
-                this.updateSliderVisibility();
+                this.updateButtonVisibility();
             }
         } catch (error) {
             console.error('ElevenLabs API check failed with error:', error);
             this.elevenLabsAvailable = false;
-            this.updateSliderVisibility();
+            this.updateButtonVisibility();
         }
     }
 
-    updateSliderVisibility() {
-        if (!this.voiceSliderContainer) return;
+    updateButtonVisibility() {
+        if (!this.voiceSettingsButton) return;
         
         if (this.elevenLabsAvailable) {
-            this.voiceSliderContainer.style.display = 'flex';
+            this.voiceSettingsButton.style.display = 'block';
             this.updateVoiceIndicator();
         } else {
-            this.voiceSliderContainer.style.display = 'none';
+            this.voiceSettingsButton.style.display = 'none';
             this.voiceMode = 0; // Force mute if ElevenLabs not available
         }
+    }
+
+    toggleVoiceSettings() {
+        if (!this.elevenLabsAvailable) return;
+        
+        this.voiceSettingsExpanded = !this.voiceSettingsExpanded;
+        
+        if (this.voiceSettingsExpanded) {
+            this.expandVoiceSettings();
+        } else {
+            this.collapseVoiceSettings();
+        }
+    }
+
+    expandVoiceSettings() {
+        if (!this.voiceSliderContainer || !this.voiceSettingsButton) return;
+        
+        this.voiceSettingsButton.classList.add('expanded');
+        this.voiceSliderContainer.style.display = 'flex';
+        this.voiceSliderContainer.classList.add('expanded');
+        
+        console.log('Voice settings expanded');
+    }
+
+    collapseVoiceSettings() {
+        if (!this.voiceSliderContainer || !this.voiceSettingsButton) return;
+        
+        this.voiceSettingsButton.classList.remove('expanded');
+        this.voiceSliderContainer.classList.remove('expanded');
+        
+        // Hide after animation
+        setTimeout(() => {
+            if (!this.voiceSettingsExpanded) {
+                this.voiceSliderContainer.style.display = 'none';
+            }
+        }, 300);
+        
+        console.log('Voice settings collapsed');
     }
 
     loadVoicePreference() {
@@ -201,6 +239,11 @@ class SpeechManager {
     }
 
     bindEvents() {
+        // Voice settings button (collapsible)
+        if (this.voiceSettingsButton) {
+            this.voiceSettingsButton.addEventListener('click', () => this.toggleVoiceSettings());
+        }
+
         // Voice slider events
         if (this.voiceRange) {
             this.voiceRange.addEventListener('input', (e) => {
