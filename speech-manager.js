@@ -75,75 +75,7 @@ class SpeechManager {
             this.voiceSliderContainer.style.display = 'flex';
             this.updateVoiceIndicator();
         } else {
-            this.voiceButton.innerHTML = '🎤';
-        }
-    }
-
-    updateStatus(text, indicator) {
-        this.statusText.textContent = text;
-        this.statusIndicator.textContent = indicator;
-    }
-
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        
-        document.querySelector('.chat-container').insertBefore(errorDiv, document.getElementById('messages'));
-        
-        setTimeout(() => {
-            errorDiv.remove();
-        }, 5000);
-    }
-
-    // Event callback setters
-    setOnListeningStart(callback) {
-        this.onListeningStart = callback;
-    }
-
-    setOnSpeechResult(callback) {
-        this.onSpeechResult = callback;
-    }
-
-    // Getters
-    getIsListening() {
-        return this.isListening;
-    }
-
-    getIsSpeaking() {
-        return this.isSpeaking;
-    }
-
-    getVoiceMode() {
-        return this.voiceMode;
-    }
-
-    getElevenLabsAvailable() {
-        return this.elevenLabsAvailable;
-    }
-
-    // Legacy compatibility methods (for existing code)
-    getIsPremiumVoiceEnabled() {
-        return this.voiceMode > 0 && this.elevenLabsAvailable;
-    }
-
-    togglePremiumVoice() {
-        // Legacy method - now cycles through voice modes
-        this.voiceMode = (this.voiceMode + 1) % 3;
-        if (this.voiceRange) {
-            this.voiceRange.value = this.voiceMode;
-        }
-        this.saveVoicePreference();
-        this.updateVoiceIndicator();
-        
-        const messages = {
-            0: 'Voice muted',
-            1: 'Female voice selected',
-            2: 'Male voice selected'
-        };
-        this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
-    }
-}voiceSliderContainer.style.display = 'none';
+            this.voiceSliderContainer.style.display = 'none';
             this.voiceMode = 0; // Force mute if ElevenLabs not available
         }
     }
@@ -216,7 +148,9 @@ class SpeechManager {
                 this.stopListening();
             };
         } else {
-            this.voiceButton.style.display = 'none';
+            if (this.voiceButton) {
+                this.voiceButton.style.display = 'none';
+            }
         }
     }
 
@@ -283,26 +217,30 @@ class SpeechManager {
         }
 
         // Voice button events
-        this.voiceButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.startListening();
-        });
-        
-        this.voiceButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.stopListening();
-        });
-        
-        this.voiceButton.addEventListener('mousedown', () => this.startListening());
-        this.voiceButton.addEventListener('mouseup', () => this.stopListening());
-        this.voiceButton.addEventListener('mouseleave', () => this.stopListening());
+        if (this.voiceButton) {
+            this.voiceButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.startListening();
+            });
+            
+            this.voiceButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.stopListening();
+            });
+            
+            this.voiceButton.addEventListener('mousedown', () => this.startListening());
+            this.voiceButton.addEventListener('mouseup', () => this.stopListening());
+            this.voiceButton.addEventListener('mouseleave', () => this.stopListening());
+        }
         
         // Stop speech when typing
-        this.messageInput.addEventListener('input', () => {
-            if (this.isSpeaking) {
-                this.stopSpeaking();
-            }
-        });
+        if (this.messageInput) {
+            this.messageInput.addEventListener('input', () => {
+                if (this.isSpeaking) {
+                    this.stopSpeaking();
+                }
+            });
+        }
     }
 
     showVoiceStatus(message, isActive) {
@@ -517,6 +455,8 @@ class SpeechManager {
     }
 
     updateVoiceButton() {
+        if (!this.voiceButton) return;
+        
         this.voiceButton.classList.remove('listening', 'speaking');
         
         if (this.isListening) {
@@ -526,4 +466,89 @@ class SpeechManager {
             this.voiceButton.classList.add('speaking');
             this.voiceButton.innerHTML = '🔊';
         } else {
-            this.
+            this.voiceButton.innerHTML = '🎤';
+        }
+    }
+
+    updateStatus(text, indicator) {
+        if (this.statusText) this.statusText.textContent = text;
+        if (this.statusIndicator) this.statusIndicator.textContent = indicator;
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            background: #e74c3c; color: white; padding: 12px 20px; 
+            border-radius: 8px; margin: 10px 20px; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        `;
+        
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            const messages = document.getElementById('messages');
+            if (messages) {
+                chatContainer.insertBefore(errorDiv, messages);
+            } else {
+                chatContainer.appendChild(errorDiv);
+            }
+        } else {
+            document.body.appendChild(errorDiv);
+        }
+        
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Event callback setters
+    setOnListeningStart(callback) {
+        this.onListeningStart = callback;
+    }
+
+    setOnSpeechResult(callback) {
+        this.onSpeechResult = callback;
+    }
+
+    // Getters
+    getIsListening() {
+        return this.isListening;
+    }
+
+    getIsSpeaking() {
+        return this.isSpeaking;
+    }
+
+    getVoiceMode() {
+        return this.voiceMode;
+    }
+
+    getElevenLabsAvailable() {
+        return this.elevenLabsAvailable;
+    }
+
+    // Legacy compatibility methods (for existing code)
+    getIsPremiumVoiceEnabled() {
+        return this.voiceMode > 0 && this.elevenLabsAvailable;
+    }
+
+    togglePremiumVoice() {
+        // Legacy method - now cycles through voice modes
+        this.voiceMode = (this.voiceMode + 1) % 3;
+        if (this.voiceRange) {
+            this.voiceRange.value = this.voiceMode;
+        }
+        this.saveVoicePreference();
+        this.updateVoiceIndicator();
+        
+        const messages = {
+            0: 'Voice muted',
+            1: 'Female voice selected',
+            2: 'Male voice selected'
+        };
+        this.showVoiceStatus(messages[this.voiceMode], this.voiceMode > 0);
+    }
+}
