@@ -1,0 +1,31 @@
+{
+  "name": "talbot-mental-health-companion",
+  "version": "1.0.0",
+  "description": "Talbot - Your Mental Health Companion PWA",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000 || python3 -m http.server 8000",
+    "dev": "netlify dev",
+    "build": "echo 'No build step required - static site'",
+    "test": "echo 'No tests specified'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/talbot.git"
+  },
+  "keywords": [
+    "mental-health",
+    "pwa",
+    "therapy",
+    "ai-companion",
+    "wellbeing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
