@@ -1,6 +1,7 @@
-// Main Talbot Application with Conversation Memory
+// Main Talbot Application with Conversation Memory - Fixed Duplication
 class TalbotApp {
     constructor() {
+        this.isProcessingMessage = false; // Prevent duplicate message processing
         this.initializeComponents();
         this.setupEventHandlers();
         this.registerServiceWorker();
@@ -8,7 +9,7 @@ class TalbotApp {
         // Load any saved data
         this.uiManager.loadChatHistory();
         
-        console.log('Talbot initialized successfully with conversation memory');
+        console.log('Talbot initialized successfully with conversation memory and duplication fixes');
     }
 
     initializeComponents() {
@@ -22,12 +23,18 @@ class TalbotApp {
     }
 
     setupEventHandlers() {
-        // Connect UI events to app logic
-        this.uiManager.setOnSendMessage(() => this.handleSendMessage());
+        // Connect UI events to app logic with duplication prevention
+        this.uiManager.setOnSendMessage(() => {
+            if (!this.isProcessingMessage) {
+                this.handleSendMessage();
+            }
+        });
         
         // Connect speech events
         this.speechManager.setOnSpeechResult((transcript) => {
-            this.handleSendMessage(); // Auto-send when speech is recognized
+            if (!this.isProcessingMessage) {
+                this.handleSendMessage(); // Auto-send when speech is recognized
+            }
         });
         
         // Handle window events
@@ -44,12 +51,26 @@ class TalbotApp {
     }
 
     async handleSendMessage() {
+        // Prevent duplicate processing
+        if (this.isProcessingMessage) {
+            console.log('Message already being processed, skipping duplicate');
+            return;
+        }
+
         const message = this.uiManager.getMessageInput();
-        if (!message) return;
+        if (!message || !message.trim()) {
+            console.log('Empty message, not sending');
+            return;
+        }
 
         try {
-            // Disable send button and clear input
-            this.uiManager.disableSendButton();
+            // Set processing state
+            this.isProcessingMessage = true;
+            this.uiManager.setProcessingState(true);
+
+            console.log('Processing message:', message);
+
+            // Add user message immediately
             this.uiManager.addMessage('user', message);
             this.uiManager.clearMessageInput();
 
@@ -76,8 +97,9 @@ class TalbotApp {
             this.uiManager.showError('Sorry mate, I had trouble processing that. Please try again.');
             this.speechManager.updateStatus('Ready to listen', '💙');
         } finally {
-            // Re-enable send button
-            this.uiManager.enableSendButton();
+            // Reset processing state
+            this.isProcessingMessage = false;
+            this.uiManager.setProcessingState(false);
             this.uiManager.focusMessageInput();
         }
     }
@@ -170,8 +192,10 @@ class TalbotApp {
 
     // Development/debugging helpers
     simulateMessage(message) {
-        this.uiManager.messageInput.value = message;
-        this.handleSendMessage();
+        if (!this.isProcessingMessage) {
+            this.uiManager.messageInput.value = message;
+            this.handleSendMessage();
+        }
     }
 
     getAppState() {
@@ -181,13 +205,18 @@ class TalbotApp {
             messageCount: this.uiManager.getMessageCount(),
             isListening: this.speechManager.getIsListening(),
             isSpeaking: this.speechManager.getIsSpeaking(),
-            conversationLength: this.uiManager.getMessages().length
+            conversationLength: this.uiManager.getMessages().length,
+            isProcessingMessage: this.isProcessingMessage
         };
     }
 
     // Error recovery
     handleError(error, context = 'Unknown') {
         console.error(`Talbot Error [${context}]:`, error);
+        
+        // Reset processing state on error
+        this.isProcessingMessage = false;
+        this.uiManager.setProcessingState(false);
         
         // Try to recover gracefully
         this.uiManager.hideTyping();
@@ -236,10 +265,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 getState: () => window.talbotApp.getAppState(),
                 simulate: (msg) => window.talbotApp.simulateMessage(msg),
                 getHistory: () => window.talbotApp.getChatMessages(),
-                version: '2.0.0-memory'
+                version: '2.0.1-fixed-duplication'
             };
             
-            console.log('🤖 Talbot v2.0 with Memory is ready! Try these console commands:');
+            console.log('🤖 Talbot v2.0.1 with Fixed Duplication is ready! Try these console commands:');
             console.log('  talbot.getState() - Get app state');
             console.log('  talbot.getHistory() - See conversation history');
             console.log('  talbot.simulate("test message") - Send a test message');
