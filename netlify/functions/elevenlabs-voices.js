@@ -21,7 +21,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const femaleVoiceId = process.env.ELEVENLABS_FEMALE_VOICE_ID || 'M7ya1YbaeFaPXljg9BpK'; // Hannah - default fallback
+  const femaleVoiceId = process.env.ELEVENLABS_FEMALE_VOICE_ID || 'XrExE9yKIg1WjnnlVkGX'; // Matilda - default fallback
   const maleVoiceId = process.env.ELEVENLABS_MALE_VOICE_ID || 'ZthjuvLPty3kTMaNKVKb'; // Peter - default fallback
   
   return {
