@@ -143,6 +143,7 @@ body {
     border-radius: var(--radius-lg);
     font-size: 0.875rem;
     font-weight: var(--font-weight-medium);
+    font-family: var(--font-family);
     cursor: pointer;
     transition: var(--transition);
     box-shadow: var(--shadow-sm);
@@ -167,6 +168,7 @@ body {
     border-radius: var(--radius-lg);
     font-size: 0.875rem;
     font-weight: var(--font-weight-medium);
+    font-family: var(--font-family);
     cursor: pointer;
     transition: var(--transition);
     box-shadow: var(--shadow-sm);
@@ -264,18 +266,8 @@ body {
     font-size: 0.75rem;
     color: var(--text-tertiary);
     font-weight: var(--font-weight-medium);
+    font-family: var(--font-family);
     margin-top: var(--spacing-xs);
-}
-
-.voice-indicator {
-    font-size: 0.875rem;
-    color: var(--text-primary);
-    text-align: center;
-    font-weight: var(--font-weight-medium);
-    padding: var(--spacing-sm);
-    background: var(--surface-2);
-    border-radius: var(--radius);
-    border: 1px solid var(--border-light);
 }
 
 .status {
