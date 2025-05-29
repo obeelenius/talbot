@@ -711,7 +711,7 @@ class SpeechManager {
             this.voiceButton.innerHTML = '🔊';
             this.voiceButton.title = 'Talbot is speaking';
         } else {
-            this.voiceButton.innerHTML = '🎤';
+            this.voiceButton.innerHTML = '<img src="/mic-icon.png" alt="Microphone" class="mic-icon">';
             this.voiceButton.title = 'Tap to start voice recording';
         }
     }
