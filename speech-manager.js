@@ -13,8 +13,11 @@ class SpeechManager {
         this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.femaleVoiceId = 'M7ya1YbaeFaPXljg9BpK'; // Hannah - Female voice
-        this.maleVoiceId = 'ZthjuvLPty3kTMaNKVKb'; // Peter - Male voice
+        
+        // Voice IDs - will be loaded from environment variables
+        this.femaleVoiceId = 'M7ya1YbaeFaPXljg9BpK'; // Default Hannah - Female voice
+        this.maleVoiceId = 'ZthjuvLPty3kTMaNKVKb'; // Default Peter - Male voice
+        
         this.voiceSettingsExpanded = false; // Track expansion state
         
         // Usage tracking
@@ -23,9 +26,44 @@ class SpeechManager {
         this.initializeElements();
         this.initializeSpeech();
         this.bindEvents();
+        this.loadVoiceIds(); // Load voice IDs from environment
         this.checkElevenLabsAPI();
         this.loadVoicePreference();
         this.showDevModeStatus();
+    }
+
+    // New method to load voice IDs from Netlify environment
+    async loadVoiceIds() {
+        try {
+            console.log('Loading voice IDs from environment...');
+            
+            const response = await fetch('/.netlify/functions/elevenlabs-voices');
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.femaleVoiceId) {
+                    this.femaleVoiceId = data.femaleVoiceId;
+                    console.log('Female voice ID loaded:', this.femaleVoiceId);
+                }
+                
+                if (data.maleVoiceId) {
+                    this.maleVoiceId = data.maleVoiceId;
+                    console.log('Male voice ID loaded:', this.maleVoiceId);
+                }
+                
+                if (data.available) {
+                    console.log('✅ Custom voice IDs loaded from environment');
+                } else {
+                    console.log('⚠️ Using default voice IDs - custom IDs not set in environment');
+                }
+            } else {
+                console.warn('Could not load voice IDs from environment, using defaults');
+            }
+        } catch (error) {
+            console.error('Error loading voice IDs:', error);
+            console.log('Using default voice IDs as fallback');
+        }
     }
 
     initializeElements() {
@@ -36,7 +74,7 @@ class SpeechManager {
         this.voiceSettingsButton = document.getElementById('voice-settings-button');
         this.voiceSliderContainer = document.getElementById('voice-slider-container');
         this.voiceRange = document.getElementById('voice-range');
-        this.voiceIndicator = document.getElementById('voice-indicator');
+        // Removed voiceIndicator element reference
     }
 
     showDevModeStatus() {
@@ -45,6 +83,8 @@ class SpeechManager {
             console.log(`📊 ElevenLabs calls made: ${this.elevenLabsCallCount}`);
             console.log(`🔇 ElevenLabs disabled: ${TalbotConfig.DISABLE_ELEVENLABS_IN_DEV}`);
             console.log(`🎤 Default voice mode: ${TalbotConfig.DEV_VOICE_MODE} (0=mute, 1=female, 2=male)`);
+            console.log(`👩 Female voice ID: ${this.femaleVoiceId}`);
+            console.log(`👨 Male voice ID: ${this.maleVoiceId}`);
             console.log('💡 Use TalbotConfig.DEV_HELPERS.toggleDevMode() to toggle');
         }
     }
@@ -53,7 +93,7 @@ class SpeechManager {
         // Called when dev mode is toggled
         this.showDevModeStatus();
         this.updateButtonVisibility();
-        this.updateVoiceIndicator();
+        // Removed updateVoiceIndicator call
     }
 
     async checkElevenLabsAPI() {
@@ -105,7 +145,7 @@ class SpeechManager {
         
         if (shouldShow) {
             this.voiceSettingsButton.style.display = 'block';
-            this.updateVoiceIndicator();
+            // Removed updateVoiceIndicator call
         } else {
             this.voiceSettingsButton.style.display = 'none';
             this.voiceMode = 0; // Force mute if not available
@@ -139,6 +179,7 @@ class SpeechManager {
         // Use ElevenLabs if available and not in dev mode
         if (this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE) {
             console.log(`Using ElevenLabs ${this.voiceMode === 1 ? 'female' : 'male'} voice`);
+            console.log(`Voice ID: ${this.voiceMode === 1 ? this.femaleVoiceId : this.maleVoiceId}`);
             await this.speakWithElevenLabs(naturalText);
         } else {
             console.log('Using browser voice');
@@ -159,8 +200,9 @@ class SpeechManager {
             const voiceType = this.voiceMode === 1 ? 'female' : 'male';
             this.updateStatus(`Talbot is speaking... (${voiceType}) 💰`, '🗣️');
 
-            // Select voice ID based on mode
+            // Select voice ID based on mode (now using loaded environment variables)
             const selectedVoiceId = this.voiceMode === 1 ? this.femaleVoiceId : this.maleVoiceId;
+            console.log(`Using voice ID: ${selectedVoiceId} for ${voiceType} voice`);
 
             const response = await fetch('/.netlify/functions/elevenlabs-tts', {
                 method: 'POST',
@@ -305,7 +347,7 @@ class SpeechManager {
             if (this.voiceRange) {
                 this.voiceRange.value = this.voiceMode;
             }
-            this.updateVoiceIndicator();
+            // Removed updateVoiceIndicator call
         } catch (error) {
             console.error('Error loading voice preference:', error);
         }
@@ -319,17 +361,7 @@ class SpeechManager {
         }
     }
 
-    updateVoiceIndicator() {
-        if (!this.voiceIndicator) return;
-        
-        const labels = ['Mute', 'Female', 'Male'];
-        const label = labels[this.voiceMode] || 'Mute';
-        const devIndicator = TalbotConfig.DEVELOPMENT_MODE ? ' 🔧' : '';
-        
-        this.voiceIndicator.textContent = label + devIndicator;
-        
-        console.log('Voice mode updated to:', label);
-    }
+    // Removed updateVoiceIndicator method entirely
 
     initializeSpeech() {
         this.initializeSpeechRecognition();
@@ -428,7 +460,7 @@ class SpeechManager {
             this.voiceRange.addEventListener('input', (e) => {
                 this.voiceMode = parseInt(e.target.value, 10);
                 this.saveVoicePreference();
-                this.updateVoiceIndicator();
+                // Removed updateVoiceIndicator call
                 
                 // Show feedback message
                 const messages = {
@@ -639,7 +671,9 @@ class SpeechManager {
         return {
             totalCalls: this.elevenLabsCallCount,
             devMode: TalbotConfig.DEVELOPMENT_MODE,
-            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV
+            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
+            femaleVoiceId: this.femaleVoiceId,
+            maleVoiceId: this.maleVoiceId
         };
     }
 
@@ -655,7 +689,7 @@ class SpeechManager {
             this.voiceRange.value = this.voiceMode;
         }
         this.saveVoicePreference();
-        this.updateVoiceIndicator();
+        // Removed updateVoiceIndicator call
         
         const messages = {
             0: 'Voice muted',
