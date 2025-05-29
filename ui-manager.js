@@ -76,7 +76,7 @@ class UIManager {
                 avatar.innerHTML = userAvatar;
             } else if (sender === 'assistant') {
                 // Use Talbot favicon for assistant messages
-                avatar.innerHTML = '<img src="/talbot-message-avatar" alt="Talbot" class="talbot-avatar">';
+                avatar.innerHTML = '<img src="/talbot-message-avatar.png" alt="Talbot" class="talbot-avatar">';
             } else {
                 // Fallback avatars
                 avatar.innerHTML = sender === 'user' ? '👤' : '🤖';
@@ -254,7 +254,7 @@ class UIManager {
             avatar.innerHTML = userAvatar;
         } else if (message.sender === 'assistant') {
             // Use Talbot favicon for assistant messages
-            avatar.innerHTML = '<img src="/talbot-message-avatar" alt="Talbot" class="talbot-avatar">';
+            avatar.innerHTML = '<img src="/talbot-message-avatar.png" alt="Talbot" class="talbot-avatar">';
         } else {
             // Fallback avatars
             avatar.innerHTML = message.sender === 'user' ? '👤' : '🤖';
