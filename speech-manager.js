@@ -15,6 +15,7 @@ class SpeechManager {
         this.finalTranscript = '';
         this.silenceTimer = null;
         this.recordingStartTime = null;
+        this.hasClicked = false;
         
         // Voice settings - 0: Mute, 1: Female, 2: Male
         this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
@@ -238,101 +239,6 @@ class SpeechManager {
                 this.isSpeaking = false;
                 this.updateVoiceButton();
                 this.updateStatus('Ready to listen', '💙');
-    }
-
-    updateStatus(text, indicator) {
-        if (this.statusText) this.statusText.textContent = text;
-        if (this.statusIndicator) this.statusIndicator.textContent = indicator;
-    }
-
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        errorDiv.style.cssText = `
-            background: #e74c3c; color: white; padding: 12px 20px; 
-            border-radius: 8px; margin: 10px 20px; font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        `;
-        
-        const chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            const messages = document.getElementById('messages');
-            if (messages) {
-                chatContainer.insertBefore(errorDiv, messages);
-            } else {
-                chatContainer.appendChild(errorDiv);
-            }
-        } else {
-            document.body.appendChild(errorDiv);
-        }
-        
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.remove();
-            }
-        }, 5000);
-    }
-
-    // Event callback setters
-    setOnListeningStart(callback) {
-        this.onListeningStart = callback;
-    }
-
-    setOnSpeechResult(callback) {
-        this.onSpeechResult = callback;
-    }
-
-    // Getters
-    getIsListening() {
-        return this.isListening;
-    }
-
-    getIsSpeaking() {
-        return this.isSpeaking;
-    }
-
-    getVoiceMode() {
-        return this.voiceMode;
-    }
-
-    getElevenLabsAvailable() {
-        return this.elevenLabsAvailable;
-    }
-
-    getUsageStats() {
-        return {
-            totalCalls: this.elevenLabsCallCount,
-            devMode: TalbotConfig.DEVELOPMENT_MODE,
-            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
-            femaleVoiceId: this.femaleVoiceId,
-            maleVoiceId: this.maleVoiceId
-        };
-    }
-
-    // Legacy compatibility methods (for existing code)
-    getIsPremiumVoiceEnabled() {
-        return this.voiceMode > 0 && this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE;
-    }
-
-    togglePremiumVoice() {
-        // Legacy method - now cycles through voice modes
-        this.voiceMode = (this.voiceMode + 1) % 3;
-        if (this.voiceRange) {
-            this.voiceRange.value = this.voiceMode;
-        }
-        this.saveVoicePreference();
-        
-        const messages = {
-            0: 'Voice muted',
-            1: 'Female voice selected',
-            2: 'Male voice selected'
-        };
-        
-        const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
-        this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
-    }
-}', '💙');
                 URL.revokeObjectURL(audioUrl);
             };
             
@@ -629,24 +535,24 @@ class SpeechManager {
 
         // Enhanced Voice button events - now tap to start/stop
         if (this.voiceButton) {
-            // Remove old hold-to-speak events and add tap-to-toggle
+            // Click event for desktop
             this.voiceButton.addEventListener('click', (e) => {
                 e.preventDefault();
+                this.hasClicked = true;
                 this.toggleListening();
             });
             
-            // Keep touch events for mobile but make them tap-based too
+            // Touch event for mobile but avoid double-triggering
             this.voiceButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                // Don't double-trigger on devices that support both touch and click
+                // Only trigger if click hasn't already been handled
                 if (!this.hasClicked) {
                     this.toggleListening();
                 }
-                this.hasClicked = false;
-            });
-            
-            this.voiceButton.addEventListener('click', () => {
-                this.hasClicked = true;
+                // Reset flag after a short delay
+                setTimeout(() => {
+                    this.hasClicked = false;
+                }, 100);
             });
         }
         
@@ -882,4 +788,99 @@ class SpeechManager {
         
         this.isSpeaking = false;
         this.updateVoiceButton();
-        this.updateStatus('Ready to listen
+        this.updateStatus('Ready to listen', '💙');
+    }
+
+    updateStatus(text, indicator) {
+        if (this.statusText) this.statusText.textContent = text;
+        if (this.statusIndicator) this.statusIndicator.textContent = indicator;
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            background: #e74c3c; color: white; padding: 12px 20px; 
+            border-radius: 8px; margin: 10px 20px; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        `;
+        
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            const messages = document.getElementById('messages');
+            if (messages) {
+                chatContainer.insertBefore(errorDiv, messages);
+            } else {
+                chatContainer.appendChild(errorDiv);
+            }
+        } else {
+            document.body.appendChild(errorDiv);
+        }
+        
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Event callback setters
+    setOnListeningStart(callback) {
+        this.onListeningStart = callback;
+    }
+
+    setOnSpeechResult(callback) {
+        this.onSpeechResult = callback;
+    }
+
+    // Getters
+    getIsListening() {
+        return this.isListening;
+    }
+
+    getIsSpeaking() {
+        return this.isSpeaking;
+    }
+
+    getVoiceMode() {
+        return this.voiceMode;
+    }
+
+    getElevenLabsAvailable() {
+        return this.elevenLabsAvailable;
+    }
+
+    getUsageStats() {
+        return {
+            totalCalls: this.elevenLabsCallCount,
+            devMode: TalbotConfig.DEVELOPMENT_MODE,
+            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
+            femaleVoiceId: this.femaleVoiceId,
+            maleVoiceId: this.maleVoiceId
+        };
+    }
+
+    // Legacy compatibility methods (for existing code)
+    getIsPremiumVoiceEnabled() {
+        return this.voiceMode > 0 && this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE;
+    }
+
+    togglePremiumVoice() {
+        // Legacy method - now cycles through voice modes
+        this.voiceMode = (this.voiceMode + 1) % 3;
+        if (this.voiceRange) {
+            this.voiceRange.value = this.voiceMode;
+        }
+        this.saveVoicePreference();
+        
+        const messages = {
+            0: 'Voice muted',
+            1: 'Female voice selected',
+            2: 'Male voice selected'
+        };
+        
+        const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
+        this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
+    }
+}
