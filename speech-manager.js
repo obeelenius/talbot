@@ -1,4 +1,4 @@
-// Enhanced Speech Manager with Development Mode and Credit Saving
+// Enhanced Speech Manager with Improved Voice Input Experience
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -8,6 +8,13 @@ class SpeechManager {
         this.currentUtterance = null;
         this.bestVoice = null;
         this.currentAudio = null;
+        
+        // Enhanced voice input properties
+        this.isRecording = false;
+        this.interimTranscript = '';
+        this.finalTranscript = '';
+        this.silenceTimer = null;
+        this.recordingStartTime = null;
         
         // Voice settings - 0: Mute, 1: Female, 2: Male
         this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
@@ -74,7 +81,6 @@ class SpeechManager {
         this.voiceSettingsButton = document.getElementById('voice-settings-button');
         this.voiceSliderContainer = document.getElementById('voice-slider-container');
         this.voiceRange = document.getElementById('voice-range');
-        // Removed voiceIndicator element reference
     }
 
     showDevModeStatus() {
@@ -93,7 +99,6 @@ class SpeechManager {
         // Called when dev mode is toggled
         this.showDevModeStatus();
         this.updateButtonVisibility();
-        // Removed updateVoiceIndicator call
     }
 
     async checkElevenLabsAPI() {
@@ -145,7 +150,6 @@ class SpeechManager {
         
         if (shouldShow) {
             this.voiceSettingsButton.style.display = 'block';
-            // Removed updateVoiceIndicator call
         } else {
             this.voiceSettingsButton.style.display = 'none';
             this.voiceMode = 0; // Force mute if not available
@@ -234,6 +238,101 @@ class SpeechManager {
                 this.isSpeaking = false;
                 this.updateVoiceButton();
                 this.updateStatus('Ready to listen', '💙');
+    }
+
+    updateStatus(text, indicator) {
+        if (this.statusText) this.statusText.textContent = text;
+        if (this.statusIndicator) this.statusIndicator.textContent = indicator;
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            background: #e74c3c; color: white; padding: 12px 20px; 
+            border-radius: 8px; margin: 10px 20px; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        `;
+        
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            const messages = document.getElementById('messages');
+            if (messages) {
+                chatContainer.insertBefore(errorDiv, messages);
+            } else {
+                chatContainer.appendChild(errorDiv);
+            }
+        } else {
+            document.body.appendChild(errorDiv);
+        }
+        
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Event callback setters
+    setOnListeningStart(callback) {
+        this.onListeningStart = callback;
+    }
+
+    setOnSpeechResult(callback) {
+        this.onSpeechResult = callback;
+    }
+
+    // Getters
+    getIsListening() {
+        return this.isListening;
+    }
+
+    getIsSpeaking() {
+        return this.isSpeaking;
+    }
+
+    getVoiceMode() {
+        return this.voiceMode;
+    }
+
+    getElevenLabsAvailable() {
+        return this.elevenLabsAvailable;
+    }
+
+    getUsageStats() {
+        return {
+            totalCalls: this.elevenLabsCallCount,
+            devMode: TalbotConfig.DEVELOPMENT_MODE,
+            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
+            femaleVoiceId: this.femaleVoiceId,
+            maleVoiceId: this.maleVoiceId
+        };
+    }
+
+    // Legacy compatibility methods (for existing code)
+    getIsPremiumVoiceEnabled() {
+        return this.voiceMode > 0 && this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE;
+    }
+
+    togglePremiumVoice() {
+        // Legacy method - now cycles through voice modes
+        this.voiceMode = (this.voiceMode + 1) % 3;
+        if (this.voiceRange) {
+            this.voiceRange.value = this.voiceMode;
+        }
+        this.saveVoicePreference();
+        
+        const messages = {
+            0: 'Voice muted',
+            1: 'Female voice selected',
+            2: 'Male voice selected'
+        };
+        
+        const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
+        this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
+    }
+}', '💙');
                 URL.revokeObjectURL(audioUrl);
             };
             
@@ -347,7 +446,6 @@ class SpeechManager {
             if (this.voiceRange) {
                 this.voiceRange.value = this.voiceMode;
             }
-            // Removed updateVoiceIndicator call
         } catch (error) {
             console.error('Error loading voice preference:', error);
         }
@@ -361,8 +459,7 @@ class SpeechManager {
         }
     }
 
-    // Removed updateVoiceIndicator method entirely
-
+    // Enhanced Speech Recognition Setup
     initializeSpeech() {
         this.initializeSpeechRecognition();
         this.initializeSpeechSynthesis();
@@ -372,33 +469,89 @@ class SpeechManager {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
-            this.recognition.continuous = false;
-            this.recognition.interimResults = false;
+            
+            // Enhanced settings for better user experience
+            this.recognition.continuous = true;        // Keep listening through pauses
+            this.recognition.interimResults = true;    // Show live transcription
             this.recognition.lang = 'en-AU';
+            this.recognition.maxAlternatives = 1;
             
             this.recognition.onstart = () => {
                 this.isListening = true;
+                this.isRecording = true;
+                this.recordingStartTime = Date.now();
+                this.interimTranscript = '';
+                this.finalTranscript = '';
                 this.updateVoiceButton();
-                this.updateStatus('Listening...', '👂');
-                this.onListeningStart?.();
+                this.updateStatus('Listening... (tap again to stop)', '👂');
+                this.updateMessageInputPlaceholder('Listening...');
+                console.log('🎤 Voice recognition started');
             };
             
             this.recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                this.messageInput.value = transcript;
-                this.onSpeechResult?.(transcript);
+                this.interimTranscript = '';
+                this.finalTranscript = '';
+                
+                // Process all results
+                for (let i = 0; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        this.finalTranscript += transcript + ' ';
+                    } else {
+                        this.interimTranscript += transcript;
+                    }
+                }
+                
+                // Show live transcription in input field
+                const fullTranscript = this.finalTranscript + this.interimTranscript;
+                this.messageInput.value = fullTranscript.trim();
+                
+                // Auto-resize the input as text grows
+                this.messageInput.style.height = 'auto';
+                this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+                
+                // Reset silence timer on new speech
+                this.resetSilenceTimer();
+                
+                console.log('🎤 Transcription:', fullTranscript);
             };
             
             this.recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-                this.showError('Voice recognition error. Please try again.');
+                
+                if (event.error === 'not-allowed') {
+                    this.showError('Microphone access denied. Please allow microphone permissions and try again.');
+                } else if (event.error === 'no-speech') {
+                    this.showVoiceStatus('No speech detected. Try speaking closer to your microphone.', false);
+                } else {
+                    this.showError('Voice recognition error. Please try again.');
+                }
+                
                 this.stopListening();
             };
             
             this.recognition.onend = () => {
-                this.stopListening();
+                if (this.isRecording) {
+                    // If we're still supposed to be recording, restart (for continuous listening)
+                    console.log('🎤 Recognition ended, but still recording - restarting...');
+                    setTimeout(() => {
+                        if (this.isRecording) {
+                            try {
+                                this.recognition.start();
+                            } catch (error) {
+                                console.log('Recognition restart failed:', error);
+                                this.stopListening();
+                            }
+                        }
+                    }, 100);
+                } else {
+                    console.log('🎤 Voice recognition ended');
+                    this.finalizeRecording();
+                }
             };
+            
         } else {
+            console.log('Speech recognition not supported');
             if (this.voiceButton) {
                 this.voiceButton.style.display = 'none';
             }
@@ -449,6 +602,7 @@ class SpeechManager {
         return bestVoice;
     }
 
+    // Enhanced Event Binding
     bindEvents() {
         // Voice settings button (collapsible)
         if (this.voiceSettingsButton) {
@@ -460,7 +614,6 @@ class SpeechManager {
             this.voiceRange.addEventListener('input', (e) => {
                 this.voiceMode = parseInt(e.target.value, 10);
                 this.saveVoicePreference();
-                // Removed updateVoiceIndicator call
                 
                 // Show feedback message
                 const messages = {
@@ -474,30 +627,186 @@ class SpeechManager {
             });
         }
 
-        // Voice button events
+        // Enhanced Voice button events - now tap to start/stop
         if (this.voiceButton) {
-            this.voiceButton.addEventListener('touchstart', (e) => {
+            // Remove old hold-to-speak events and add tap-to-toggle
+            this.voiceButton.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.startListening();
+                this.toggleListening();
             });
             
+            // Keep touch events for mobile but make them tap-based too
             this.voiceButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                this.stopListening();
+                // Don't double-trigger on devices that support both touch and click
+                if (!this.hasClicked) {
+                    this.toggleListening();
+                }
+                this.hasClicked = false;
             });
             
-            this.voiceButton.addEventListener('mousedown', () => this.startListening());
-            this.voiceButton.addEventListener('mouseup', () => this.stopListening());
-            this.voiceButton.addEventListener('mouseleave', () => this.stopListening());
+            this.voiceButton.addEventListener('click', () => {
+                this.hasClicked = true;
+            });
         }
         
-        // Stop speech when typing
+        // Stop speech when typing manually
         if (this.messageInput) {
-            this.messageInput.addEventListener('input', () => {
+            this.messageInput.addEventListener('input', (e) => {
+                // Only stop speaking, don't stop listening (user might want to continue dictating)
                 if (this.isSpeaking) {
                     this.stopSpeaking();
                 }
+                
+                // If they're typing manually while recording, stop recording
+                if (this.isListening && !this.isRecording) {
+                    // This means they started typing after recording finished
+                    // Reset the placeholder
+                    this.updateMessageInputPlaceholder();
+                }
             });
+        }
+    }
+
+    // New Enhanced Voice Input Methods
+
+    toggleListening() {
+        if (this.isListening) {
+            this.stopListening();
+        } else {
+            this.startListening();
+        }
+    }
+
+    startListening() {
+        if (!this.recognition || this.isListening) return;
+        
+        try {
+            // Clear any existing content
+            this.messageInput.value = '';
+            this.finalTranscript = '';
+            this.interimTranscript = '';
+            
+            console.log('🎤 Starting enhanced voice recognition...');
+            this.recognition.start();
+            
+        } catch (error) {
+            console.error('Failed to start voice recognition:', error);
+            this.showError('Could not start voice recognition. Please try again.');
+        }
+    }
+
+    stopListening() {
+        if (!this.recognition || !this.isListening) return;
+        
+        console.log('🎤 Stopping voice recognition...');
+        this.isRecording = false; // This will prevent restart in onend
+        
+        try {
+            this.recognition.stop();
+        } catch (error) {
+            console.log('Recognition already stopped');
+        }
+        
+        this.clearSilenceTimer();
+        this.finalizeRecording();
+    }
+
+    finalizeRecording() {
+        this.isListening = false;
+        this.isRecording = false;
+        this.updateVoiceButton();
+        
+        const finalText = this.messageInput.value.trim();
+        
+        if (finalText) {
+            // Show success feedback
+            const duration = this.recordingStartTime ? 
+                Math.round((Date.now() - this.recordingStartTime) / 1000) : 0;
+            
+            this.updateStatus(`Recorded ${duration}s - Review your message`, '✅');
+            this.updateMessageInputPlaceholder('Review and edit your message, then press send');
+            
+            // Focus on input so user can edit if needed
+            this.messageInput.focus();
+            
+            // Position cursor at end
+            this.messageInput.setSelectionRange(finalText.length, finalText.length);
+            
+            console.log(`🎤 Recording completed: "${finalText}" (${duration}s)`);
+            
+        } else {
+            this.updateStatus('No speech detected - try again', '❌');
+            this.updateMessageInputPlaceholder();
+            
+            setTimeout(() => {
+                this.updateStatus('Ready to listen', '💙');
+            }, 2000);
+        }
+        
+        // Reset transcripts
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+        this.recordingStartTime = null;
+    }
+
+    // Silence Detection
+    resetSilenceTimer() {
+        this.clearSilenceTimer();
+        
+        // After 3 seconds of silence, stop recording
+        this.silenceTimer = setTimeout(() => {
+            if (this.isRecording && this.finalTranscript.trim()) {
+                console.log('🎤 Silence detected, finalizing recording...');
+                this.stopListening();
+            }
+        }, 3000);
+    }
+
+    clearSilenceTimer() {
+        if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+        }
+    }
+
+    // UI Helper Methods
+    updateMessageInputPlaceholder(customText = null) {
+        if (!this.messageInput) return;
+        
+        if (customText) {
+            this.messageInput.placeholder = customText;
+        } else {
+            // Restore responsive placeholder
+            const width = window.innerWidth;
+            if (width <= 360) {
+                this.messageInput.placeholder = "What's on your mind?";
+            } else if (width <= 480) {
+                this.messageInput.placeholder = "What's on your mind? Tap mic to speak";
+            } else if (width <= 768) {
+                this.messageInput.placeholder = "What's on your mind? Tap mic to speak";
+            } else {
+                this.messageInput.placeholder = "What's on your mind? Type or tap the mic to speak...";
+            }
+        }
+    }
+
+    updateVoiceButton() {
+        if (!this.voiceButton) return;
+        
+        this.voiceButton.classList.remove('listening', 'speaking');
+        
+        if (this.isListening) {
+            this.voiceButton.classList.add('listening');
+            this.voiceButton.innerHTML = '⏹️';
+            this.voiceButton.title = 'Tap to stop recording';
+        } else if (this.isSpeaking) {
+            this.voiceButton.classList.add('speaking');
+            this.voiceButton.innerHTML = '🔊';
+            this.voiceButton.title = 'Talbot is speaking';
+        } else {
+            this.voiceButton.innerHTML = '🎤';
+            this.voiceButton.title = 'Tap to start voice recording';
         }
     }
 
@@ -533,22 +842,7 @@ class SpeechManager {
             statusDiv.style.transform = 'translateY(-10px)';
             statusDiv.style.opacity = '0';
             setTimeout(() => statusDiv.remove(), 300);
-        }, 2000);
-    }
-
-    startListening() {
-        if (this.recognition && !this.isListening) {
-            this.recognition.start();
-        }
-    }
-
-    stopListening() {
-        if (this.recognition && this.isListening) {
-            this.recognition.stop();
-            this.isListening = false;
-            this.updateVoiceButton();
-            this.updateStatus('Ready to listen', '💙');
-        }
+        }, 3000);
     }
 
     makeTextMoreNatural(text) {
@@ -588,116 +882,4 @@ class SpeechManager {
         
         this.isSpeaking = false;
         this.updateVoiceButton();
-        this.updateStatus('Ready to listen', '💙');
-    }
-
-    updateVoiceButton() {
-        if (!this.voiceButton) return;
-        
-        this.voiceButton.classList.remove('listening', 'speaking');
-        
-        if (this.isListening) {
-            this.voiceButton.classList.add('listening');
-            this.voiceButton.innerHTML = '⏹️';
-        } else if (this.isSpeaking) {
-            this.voiceButton.classList.add('speaking');
-            this.voiceButton.innerHTML = '🔊';
-        } else {
-            this.voiceButton.innerHTML = '🎤';
-        }
-    }
-
-    updateStatus(text, indicator) {
-        if (this.statusText) this.statusText.textContent = text;
-        if (this.statusIndicator) this.statusIndicator.textContent = indicator;
-    }
-
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        errorDiv.style.cssText = `
-            background: #e74c3c; color: white; padding: 12px 20px; 
-            border-radius: 8px; margin: 10px 20px; font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        `;
-        
-        const chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            const messages = document.getElementById('messages');
-            if (messages) {
-                chatContainer.insertBefore(errorDiv, messages);
-            } else {
-                chatContainer.appendChild(errorDiv);
-            }
-        } else {
-            document.body.appendChild(errorDiv);
-        }
-        
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.remove();
-            }
-        }, 5000);
-    }
-
-    // Event callback setters
-    setOnListeningStart(callback) {
-        this.onListeningStart = callback;
-    }
-
-    setOnSpeechResult(callback) {
-        this.onSpeechResult = callback;
-    }
-
-    // Getters
-    getIsListening() {
-        return this.isListening;
-    }
-
-    getIsSpeaking() {
-        return this.isSpeaking;
-    }
-
-    getVoiceMode() {
-        return this.voiceMode;
-    }
-
-    getElevenLabsAvailable() {
-        return this.elevenLabsAvailable;
-    }
-
-    getUsageStats() {
-        return {
-            totalCalls: this.elevenLabsCallCount,
-            devMode: TalbotConfig.DEVELOPMENT_MODE,
-            elevenLabsDisabled: TalbotConfig.DISABLE_ELEVENLABS_IN_DEV,
-            femaleVoiceId: this.femaleVoiceId,
-            maleVoiceId: this.maleVoiceId
-        };
-    }
-
-    // Legacy compatibility methods (for existing code)
-    getIsPremiumVoiceEnabled() {
-        return this.voiceMode > 0 && this.elevenLabsAvailable && !TalbotConfig.DEVELOPMENT_MODE;
-    }
-
-    togglePremiumVoice() {
-        // Legacy method - now cycles through voice modes
-        this.voiceMode = (this.voiceMode + 1) % 3;
-        if (this.voiceRange) {
-            this.voiceRange.value = this.voiceMode;
-        }
-        this.saveVoicePreference();
-        // Removed updateVoiceIndicator call
-        
-        const messages = {
-            0: 'Voice muted',
-            1: 'Female voice selected',
-            2: 'Male voice selected'
-        };
-        
-        const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
-        this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
-    }
-}
+        this.updateStatus('Ready to listen
