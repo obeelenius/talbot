@@ -1,7 +1,7 @@
 // Talbot Configuration - System Prompt and Settings with Development Mode
 const TalbotConfig = {
     // Development Settings - Change these for dev/production
-    DEVELOPMENT_MODE: true, // Set to false for production
+    DEVELOPMENT_MODE: false, // Set to false for production
     DISABLE_ELEVENLABS_IN_DEV: true, // Skip ElevenLabs API calls in dev mode
     DEV_VOICE_MODE: 0, // Default voice mode in dev (0=mute, 1=female, 2=male)
     MAX_TEXT_LENGTH_FOR_ELEVENLABS: 300, // Only use ElevenLabs for shorter messages
