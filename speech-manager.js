@@ -13,7 +13,7 @@ class SpeechManager {
         this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
         this.elevenLabsAvailable = false;
         this.elevenLabsApiKey = null;
-        this.femaleVoiceId = 'ZthjuvLPty3kTMaNKVKb'; // Frances - Female voice
+        this.femaleVoiceId = 'SB13jgWjPxi4e4JoTT1H'; // Isla - Female voice
         this.maleVoiceId = 'ZthjuvLPty3kTMaNKVKb'; // Peter - Male voice
         this.voiceSettingsExpanded = false; // Track expansion state
         
