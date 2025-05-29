@@ -711,7 +711,27 @@ class SpeechManager {
             this.voiceButton.innerHTML = '🔊';
             this.voiceButton.title = 'Talbot is speaking';
         } else {
-            this.voiceButton.innerHTML = '<img src="/mic-icon.png" alt="Microphone" class="mic-icon">';
+            // Clear any existing content first
+            this.voiceButton.innerHTML = '';
+            
+            // Create and configure the image element
+            const micIcon = document.createElement('img');
+            micIcon.src = '/mic-icon.png';
+            micIcon.alt = 'Microphone';
+            micIcon.className = 'mic-icon';
+            
+            // Add error handling
+            micIcon.onerror = () => {
+                console.log('Custom mic icon failed to load, using emoji fallback');
+                this.voiceButton.innerHTML = '🎤';
+            };
+            
+            micIcon.onload = () => {
+                console.log('✅ Custom mic icon loaded successfully');
+            };
+            
+            // Add the image to the button
+            this.voiceButton.appendChild(micIcon);
             this.voiceButton.title = 'Tap to start voice recording';
         }
     }
