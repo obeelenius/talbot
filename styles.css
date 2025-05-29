@@ -447,6 +447,18 @@ body {
     box-sizing: border-box;
 }
 
+/* Custom mic icon styling */
+.mic-icon {
+    width: 24px;
+    height: 24px;
+    filter: brightness(0) invert(1); /* Makes it white to match button color scheme */
+    transition: var(--transition);
+}
+
+.action-button:hover .mic-icon {
+    transform: scale(1.1);
+}
+
 .action-button:hover:not(:disabled) {
     background: var(--primary-dark);
     transform: translateY(-1px);
