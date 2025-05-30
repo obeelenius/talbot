@@ -1028,6 +1028,12 @@ body {
     z-index: 10;
 }
 
+/* Make all buttons in profile actions the same width */
+.profile-actions .btn {
+    min-width: 140px;
+    flex: 0 0 auto;
+}
+
 /* Checkbox Styles */
 .checkbox-group {
     display: flex;
