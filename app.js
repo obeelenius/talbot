@@ -1,351 +1,344 @@
-// Main Talbot Application with Conversation Management
+// Main App - Initialize Talbot Application
 class TalbotApp {
     constructor() {
-        this.isProcessingMessage = false; // Prevent duplicate message processing
-        this.initializeComponents();
-        this.setupEventHandlers();
-        this.registerServiceWorker();
+        this.uiManager = null;
+        this.profileManager = null;
+        this.conversationManager = null;
+        this.aiHandler = null;
         
-        // Load any saved data
-        this.uiManager.loadChatHistory();
-        
-        console.log('Talbot initialized successfully with conversation management');
+        this.init();
     }
 
-    initializeComponents() {
-        // Initialize managers in order of dependency
-        this.profileManager = new ProfileManager();
-        this.speechManager = new SpeechManager();
+    async init() {
+        try {
+            console.log('Initializing Talbot App...');
+            
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                await new Promise(resolve => {
+                    document.addEventListener('DOMContentLoaded', resolve);
+                });
+            }
+
+            // Initialize managers in correct order
+            this.initializeManagers();
+            
+            // Set up global references
+            this.setupGlobalReferences();
+            
+            // Initialize app state
+            this.initializeAppState();
+            
+            console.log('Talbot App initialized successfully');
+            
+        } catch (error) {
+            console.error('Error initializing Talbot App:', error);
+            this.showInitializationError();
+        }
+    }
+
+    initializeManagers() {
+        // Initialize UI Manager first
         this.uiManager = new UIManager();
         
-        // Pass uiManager to aiResponseManager so it can access conversation history
-        this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
+        // Initialize Profile Manager
+        this.profileManager = new ProfileManager();
         
-        // Initialize conversation manager after other components
+        // Initialize Conversation Manager
         this.conversationManager = new ConversationManager(this.uiManager, this.profileManager);
+        
+        // Initialize AI Handler last (depends on other managers)
+        this.aiHandler = new AIHandler(this.uiManager, this.profileManager, this.conversationManager);
     }
 
-    setupEventHandlers() {
-        // Connect UI events to app logic with duplication prevention
-        this.uiManager.setOnSendMessage((message) => {
-            if (!this.isProcessingMessage) {
-                this.handleSendMessage(message);
-            }
-        });
+    setupGlobalReferences() {
+        // Make managers available globally for cross-component communication
+        window.talbotApp = this;
+        window.uiManager = this.uiManager;
+        window.profileManager = this.profileManager;
+        window.conversationManager = this.conversationManager;
+        window.aiHandler = this.aiHandler;
+    }
+
+    initializeAppState() {
+        // Check if user has a profile
+        if (!this.profileManager.hasProfile()) {
+            this.showProfilePrompt();
+        }
+
+        // Show conversation memory notice if applicable
+        if (this.conversationManager.hasConversationMemory()) {
+            this.showConversationMemoryNotice();
+        }
+
+        // Set up error handling
+        this.setupErrorHandling();
         
-        // Connect speech events - for auto-send voice messages
-        this.speechManager.setOnSpeechResult((transcript) => {
-            if (!this.isProcessingMessage) {
-                this.handleSendMessage(transcript);
+        // Set up periodic health checks
+        this.setupHealthChecks();
+    }
+
+    showProfilePrompt() {
+        // Show a gentle prompt to set up profile
+        setTimeout(() => {
+            const shouldSetupProfile = confirm(
+                "Welcome to Talbot!\n\n" +
+                "Would you like to set up your profile? This helps me provide more personalized support.\n\n" +
+                "You can always do this later by clicking the profile button."
+            );
+            
+            if (shouldSetupProfile) {
+                this.profileManager.openProfileModal();
             }
+        }, 2000); // Show after 2 seconds
+    }
+
+    showConversationMemoryNotice() {
+        const memory = this.conversationManager.getConversationMemory();
+        if (memory && memory.topics && memory.topics.length > 0) {
+            const noticeDiv = document.createElement('div');
+            noticeDiv.className = 'memory-notice';
+            noticeDiv.innerHTML = `
+                <div class="memory-content">
+                    <strong>Continuing our conversation</strong>
+                    <p>I remember we were discussing: ${memory.topics.slice(0, 3).join(', ')}</p>
+                    <button onclick="this.parentElement.parentElement.remove()">Got it</button>
+                </div>
+            `;
+            noticeDiv.style.cssText = `
+                position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+                z-index: 1001; background: #f8f9fa; border: 1px solid #dee2e6;
+                padding: 16px; border-radius: 8px; font-size: 14px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-family: 'Lora', serif;
+                max-width: 400px; text-align: center;
+            `;
+            
+            document.body.appendChild(noticeDiv);
+            
+            // Auto-remove after 8 seconds
+            setTimeout(() => {
+                if (noticeDiv.parentElement) {
+                    noticeDiv.remove();
+                }
+            }, 8000);
+        }
+    }
+
+    setupErrorHandling() {
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+            this.handleGlobalError(event.error);
         });
-        
-        // Handle window events
-        window.addEventListener('beforeunload', () => {
-            this.cleanup();
-        });
-        
-        // Handle visibility changes (for mobile)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && this.speechManager.getIsSpeaking()) {
-                this.speechManager.stopSpeaking();
-            }
+
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            this.handleGlobalError(event.reason);
         });
     }
 
-    async handleSendMessage(message = null) {
-        // Prevent duplicate processing
-        if (this.isProcessingMessage) {
-            console.log('Message already being processed, skipping duplicate');
-            return;
-        }
+    handleGlobalError(error) {
+        // Log error details for debugging
+        const errorInfo = {
+            message: error.message || 'Unknown error',
+            stack: error.stack || 'No stack trace',
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
 
-        // Get message from parameter or UI input
-        const messageText = message || this.uiManager.getMessageInput();
-        if (!messageText || !messageText.trim()) {
-            console.log('Empty message, not sending');
-            return;
-        }
+        console.error('Talbot Error [Global Error]:', errorInfo);
 
+        // Show user-friendly error message
+        this.showErrorNotification(
+            "I'm experiencing a technical issue. Please refresh the page if problems persist."
+        );
+    }
+
+    setupHealthChecks() {
+        // Periodic health check
+        setInterval(() => {
+            this.performHealthCheck();
+        }, 60000); // Every minute
+
+        // Initial health check
+        setTimeout(() => {
+            this.performHealthCheck();
+        }, 5000); // After 5 seconds
+    }
+
+    performHealthCheck() {
+        const healthStatus = {
+            timestamp: new Date().toISOString(),
+            managers: {
+                uiManager: !!this.uiManager,
+                profileManager: !!this.profileManager,
+                conversationManager: !!this.conversationManager,
+                aiHandler: !!this.aiHandler
+            },
+            localStorage: this.checkLocalStorageAccess(),
+            domElements: this.checkCriticalElements()
+        };
+
+        // Log health status (for debugging)
+        console.log('Health check:', healthStatus);
+
+        // Take corrective action if needed
+        if (!healthStatus.managers.uiManager || !healthStatus.managers.aiHandler) {
+            console.warn('Critical managers missing, attempting re-initialization...');
+            this.attemptRecovery();
+        }
+    }
+
+    checkLocalStorageAccess() {
         try {
-            // Set processing state
-            this.isProcessingMessage = true;
-            this.uiManager.setProcessingState(true);
-
-            console.log('Processing message:', messageText);
-
-            // Add user message immediately
-            this.uiManager.addMessage('user', messageText);
-            this.uiManager.clearMessageInput();
-
-            // Show typing indicator
-            this.uiManager.showTyping();
-            this.speechManager.updateStatus('Talbot is thinking...', '🤔');
-
-            // Get enhanced AI response with conversation context
-            const response = await this.getEnhancedAIResponse(messageText);
-
-            // Hide typing and show response
-            this.uiManager.hideTyping();
-            this.uiManager.addMessage('assistant', response);
-            
-            // Speak the response
-            this.speechManager.speakMessage(response);
-            
-            // Update status
-            this.speechManager.updateStatus('Ready to listen', '💙');
-
+            localStorage.setItem('talbot-health-check', 'test');
+            localStorage.removeItem('talbot-health-check');
+            return true;
         } catch (error) {
-            console.error('Error handling message:', error);
-            this.uiManager.hideTyping();
-            this.uiManager.showError('Sorry mate, I had trouble processing that. Please try again.');
-            this.speechManager.updateStatus('Ready to listen', '💙');
-        } finally {
-            // Reset processing state
-            this.isProcessingMessage = false;
-            this.uiManager.setProcessingState(false);
-            this.uiManager.focusMessageInput();
+            return false;
         }
     }
 
-    // Enhanced AI response that includes conversation context
-    async getEnhancedAIResponse(message) {
+    checkCriticalElements() {
+        const criticalElements = [
+            'messages-container',
+            'message-input',
+            'send-button'
+        ];
+
+        return criticalElements.reduce((acc, id) => {
+            acc[id] = !!document.getElementById(id);
+            return acc;
+        }, {});
+    }
+
+    attemptRecovery() {
         try {
-            // Get conversation context if available
-            const conversationContext = this.conversationManager.getConversationContext();
-            
-            // Build enhanced contextual message
-            let enhancedMessage = message;
-            
-            if (conversationContext) {
-                enhancedMessage = `${conversationContext}\n\nCurrent message: ${message}`;
-                console.log('Adding conversation context to message');
+            // Re-initialize missing managers
+            if (!this.uiManager) {
+                this.uiManager = new UIManager();
+                window.uiManager = this.uiManager;
             }
             
-            // Get the AI response with full context
-            const response = await this.aiResponseManager.getAIResponse(enhancedMessage);
+            if (!this.aiHandler) {
+                this.aiHandler = new AIHandler(this.uiManager, this.profileManager, this.conversationManager);
+                window.aiHandler = this.aiHandler;
+            }
             
-            return response;
-            
+            console.log('Recovery attempt completed');
         } catch (error) {
-            console.error('Enhanced AI response failed:', error);
-            // Fallback to regular response without context
-            return await this.aiResponseManager.getAIResponse(message);
+            console.error('Recovery failed:', error);
         }
     }
 
-    // Service Worker Registration for PWA
-    async registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            try {
-                const swCode = `
-                    const CACHE_NAME = 'talbot-v3';
-                    const urlsToCache = [
-                        '/',
-                        '/index.html',
-                        '/styles.css',
-                        '/talbot-config.js',
-                        '/profile-manager.js',
-                        '/speech-manager.js',
-                        '/ai-response-manager.js',
-                        '/ui-manager.js',
-                        '/conversation-manager.js',
-                        '/app.js'
-                    ];
-                    
-                    self.addEventListener('install', (event) => {
-                        event.waitUntil(
-                            caches.open(CACHE_NAME)
-                                .then((cache) => {
-                                    return cache.addAll(urlsToCache).catch(err => {
-                                        console.log('Cache addAll failed:', err);
-                                    });
-                                })
-                        );
-                    });
-                    
-                    self.addEventListener('fetch', (event) => {
-                        event.respondWith(
-                            caches.match(event.request)
-                                .then((response) => {
-                                    return response || fetch(event.request);
-                                })
-                                .catch(() => {
-                                    if (event.request.destination === 'document') {
-                                        return caches.match('/index.html');
-                                    }
-                                })
-                        );
-                    });
-                `;
-                
-                const blob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                
-                const registration = await navigator.serviceWorker.register(swUrl);
-                console.log('Service Worker registered successfully:', registration.scope);
-                
-            } catch (error) {
-                console.log('Service Worker registration failed:', error);
-            }
-        }
-    }
-
-    // Cleanup method
-    cleanup() {
-        // Stop any ongoing speech
-        if (this.speechManager.getIsSpeaking()) {
-            this.speechManager.stopSpeaking();
-        }
+    showErrorNotification(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-notification';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1003; background: #e74c3c; color: white;
+            padding: 12px 24px; border-radius: 8px; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-family: 'Lora', serif;
+            max-width: 400px; text-align: center;
+            opacity: 0; transition: all 0.3s ease;
+        `;
         
-        // Stop listening
-        if (this.speechManager.getIsListening()) {
-            this.speechManager.stopListening();
-        }
+        document.body.appendChild(errorDiv);
+        
+        // Show with animation
+        setTimeout(() => {
+            errorDiv.style.opacity = '1';
+        }, 100);
+        
+        // Hide after delay
+        setTimeout(() => {
+            errorDiv.style.opacity = '0';
+            setTimeout(() => {
+                if (errorDiv.parentElement) {
+                    errorDiv.remove();
+                }
+            }, 300);
+        }, 5000);
     }
 
-    // Public methods for external access
-    exportChatHistory() {
-        this.uiManager.exportChat();
+    showInitializationError() {
+        document.body.innerHTML = `
+            <div style="
+                display: flex; justify-content: center; align-items: center; 
+                height: 100vh; font-family: 'Lora', serif; text-align: center;
+                background: #f8f9fa; color: #333;
+            ">
+                <div>
+                    <h1 style="color: #e74c3c; margin-bottom: 16px;">Oops!</h1>
+                    <p style="margin-bottom: 16px;">Something went wrong while starting Talbot.</p>
+                    <button onclick="window.location.reload()" style="
+                        background: #3498db; color: white; border: none; 
+                        padding: 12px 24px; border-radius: 6px; cursor: pointer;
+                        font-family: 'Lora', serif; font-size: 14px;
+                    ">
+                        Refresh Page
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
-    clearChatHistory() {
-        this.uiManager.clearChatHistory();
-    }
-
-    getProfile() {
-        return this.profileManager.getProfile();
-    }
-
-    getChatMessages() {
-        return this.uiManager.getMessages();
-    }
-
-    getConversationMemory() {
-        return this.conversationManager.getConversationMemory();
-    }
-
-    // Development/debugging helpers
-    simulateMessage(message) {
-        if (!this.isProcessingMessage) {
-            this.handleSendMessage(message);
-        }
-    }
-
-    getAppState() {
+    // Public API methods
+    getAppStatus() {
         return {
-            profile: this.profileManager.getProfile(),
-            documents: this.profileManager.getDocuments(),
-            messageCount: this.uiManager.getMessageCount(),
-            isListening: this.speechManager.getIsListening(),
-            isSpeaking: this.speechManager.getIsSpeaking(),
-            conversationLength: this.uiManager.getMessages().length,
-            conversationMemory: this.conversationManager.getConversationMemory(),
-            hasConversationMemory: this.conversationManager.hasConversationMemory(),
-            isProcessingMessage: this.isProcessingMessage
+            initialized: !!(this.uiManager && this.profileManager && this.conversationManager && this.aiHandler),
+            managers: {
+                uiManager: !!this.uiManager,
+                profileManager: !!this.profileManager,
+                conversationManager: !!this.conversationManager,
+                aiHandler: !!this.aiHandler
+            },
+            hasProfile: this.profileManager?.hasProfile() || false,
+            hasMessages: this.uiManager?.hasMessages() || false,
+            hasConversationMemory: this.conversationManager?.hasConversationMemory() || false
         };
     }
 
-    // Conversation management helpers
-    startNewConversation(keepContext = true) {
-        if (keepContext) {
-            this.conversationManager.handleKeepContext();
-        } else {
-            this.conversationManager.handleCompleteReset();
-        }
+    exportAppData() {
+        const appData = {
+            exportDate: new Date().toISOString(),
+            profile: this.profileManager?.profile || null,
+            messages: this.uiManager?.getMessages() || [],
+            conversationMemory: this.conversationManager?.getConversationMemory() || null,
+            stats: {
+                messageStats: this.uiManager?.getMessageStats() || null,
+                conversationStats: this.aiHandler?.getConversationStats() || null
+            }
+        };
+
+        const dataStr = JSON.stringify(appData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `talbot-data-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
-    // Error recovery
-    handleError(error, context = 'Unknown') {
-        console.error(`Talbot Error [${context}]:`, error);
-        
-        // Reset processing state on error
-        this.isProcessingMessage = false;
-        this.uiManager.setProcessingState(false);
-        
-        // Try to recover gracefully
-        this.uiManager.hideTyping();
-        this.speechManager.updateStatus('Ready to listen', '💙');
-        this.uiManager.enableSendButton();
-        
-        // Show user-friendly error message
-        const errorMessages = [
-            "I'm having a bit of trouble right now, but I'm still here for you.",
-            "Something went wrong on my end, mate. Can you try that again?",
-            "I hit a snag there, but I'm ready to listen when you are.",
-            "Technical hiccup! I'm back now - what were you saying?"
-        ];
-        
-        const randomError = errorMessages[Math.floor(Math.random() * errorMessages.length)];
-        this.uiManager.showError(randomError);
+    reset() {
+        if (confirm('Are you sure you want to reset everything? This will clear all data and cannot be undone.')) {
+            localStorage.clear();
+            window.location.reload();
+        }
     }
 }
 
-// Global error handler
-window.addEventListener('error', (event) => {
-    if (window.talbotApp) {
-        window.talbotApp.handleError(event.error, 'Global Error');
-    }
-});
-
-// Unhandled promise rejection handler
-window.addEventListener('unhandledrejection', (event) => {
-    if (window.talbotApp) {
-        window.talbotApp.handleError(event.reason, 'Unhandled Promise');
-    }
-    event.preventDefault();
-});
-
-// Initialize the app when DOM is loaded
+// Initialize app when script loads
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        window.talbotApp = new TalbotApp();
-        
-        // Add helpful console methods for development
-        if (typeof window !== 'undefined') {
-            window.talbot = {
-                exportChat: () => window.talbotApp.exportChatHistory(),
-                clearChat: () => window.talbotApp.clearChatHistory(),
-                getProfile: () => window.talbotApp.getProfile(),
-                getState: () => window.talbotApp.getAppState(),
-                simulate: (msg) => window.talbotApp.simulateMessage(msg),
-                getHistory: () => window.talbotApp.getChatMessages(),
-                getMemory: () => window.talbotApp.getConversationMemory(),
-                startFresh: (keepContext = true) => window.talbotApp.startNewConversation(keepContext),
-                version: '3.0.0-conversation-management'
-            };
-            
-            console.log('🤖 Talbot v3.0.0 with Conversation Management is ready! Try these console commands:');
-            console.log('  talbot.getState() - Get app state');
-            console.log('  talbot.getHistory() - See conversation history');
-            console.log('  talbot.getMemory() - See conversation memory');
-            console.log('  talbot.simulate("test message") - Send a test message');
-            console.log('  talbot.startFresh(true) - Start new conversation keeping context');
-            console.log('  talbot.startFresh(false) - Complete reset');
-            console.log('  talbot.exportChat() - Export chat history');
-            console.log('  talbot.clearChat() - Clear chat history');
-        }
-        
-    } catch (error) {
-        console.error('Failed to initialize Talbot:', error);
-        
-        // Show fallback error message
-        const errorDiv = document.createElement('div');
-        errorDiv.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: #666;">
-                <h2 style="color: #e74c3c;">Oops! Something went wrong</h2>
-                <p>Talbot couldn't start properly. Please refresh the page and try again.</p>
-                <p style="font-size: 12px; margin-top: 20px;">Error: ${error.message}</p>
-                <button onclick="window.location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #4A90E2; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                    Refresh Page
-                </button>
-            </div>
-        `;
-        
-        const container = document.querySelector('.container');
-        if (container) {
-            container.innerHTML = '';
-            container.appendChild(errorDiv);
-        }
-    }
+    window.talbotApp = new TalbotApp();
 });
+
+// Fallback initialization if DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+    window.talbotApp = new TalbotApp();
+}
