@@ -914,6 +914,13 @@ body {
     flex: 1;
 }
 
+.form-help {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: var(--spacing-xs);
+    display: block;
+}
+
 /* Profile Photo Upload */
 .profile-photo-section {
     text-align: center;
@@ -1014,18 +1021,13 @@ body {
     background: var(--burgundy-600);
 }
 
-/* Sticky Profile Actions */
 .profile-actions {
-    position: sticky;
-    bottom: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border-light);
-    padding: var(--spacing-xl) var(--spacing-2xl);
     display: flex;
     gap: var(--spacing-md);
     justify-content: flex-end;
-    z-index: 10;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    padding-top: var(--spacing-xl);
+    border-top: 1px solid var(--border-light);
+    margin-top: var(--spacing-xl);
 }
 
 /* Checkbox Styles */
@@ -1154,6 +1156,27 @@ body {
         flex-direction: column;
         gap: var(--spacing-md);
     }
+        .profile-content,
+    .conversation-content {
+        margin: var(--spacing-md);
+        border-radius: var(--radius-lg);
+        max-height: calc(100vh - 2rem);
+    }
+    
+    .profile-form,
+    .conversation-body {
+        padding: var(--spacing-xl);
+        padding-bottom: 100px; /* Adjust for mobile */
+    }
+    
+    .profile-actions {
+        flex-direction: column;
+        padding: var(--spacing-md) var(--spacing-xl);
+    }
+    
+    .conversation-actions {
+        padding: var(--spacing-md) var(--spacing-xl);
+    }
 }
 
 /* Very narrow screens - align status left to avoid overlap */
@@ -1201,6 +1224,22 @@ body {
         min-width: 140px;
         padding: var(--spacing-md);
         font-size: 0.75rem;
+    }
+        .profile-content,
+    .conversation-content {
+        margin: var(--spacing-sm);
+        max-height: calc(100vh - 1rem);
+    }
+    
+    .profile-form,
+    .conversation-body {
+        padding: var(--spacing-md);
+        padding-bottom: 90px; /* Adjust for very small screens */
+    }
+    
+    .profile-actions,
+    .conversation-actions {
+        padding: var(--spacing-sm) var(--spacing-md);
     }
 }
 
@@ -1279,3 +1318,4 @@ body {
         opacity: 1;
     }
 }
+// OLD END
