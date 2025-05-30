@@ -346,12 +346,24 @@ class TalbotApp {
     }
 }
 
-// Initialize app when script loads
-document.addEventListener('DOMContentLoaded', () => {
-    window.talbotApp = new TalbotApp();
-});
-
-// Fallback initialization if DOMContentLoaded already fired
-if (document.readyState !== 'loading') {
-    window.talbotApp = new TalbotApp();
-}
+// FIXED: Single initialization point to prevent duplicate instances
+(function initializeTalbot() {
+    // Prevent multiple initializations
+    if (window.talbotApp) {
+        console.warn('🚨 TalbotApp already exists, skipping initialization');
+        return;
+    }
+    
+    function createApp() {
+        console.log('🚀 Creating TalbotApp instance');
+        window.talbotApp = new TalbotApp();
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', createApp, { once: true });
+    } else {
+        // DOM already loaded
+        createApp();
+    }
+})();
