@@ -1018,7 +1018,7 @@ body {
     position: sticky;
     bottom: 0;
     background: var(--surface);
-    padding: var(--spacing-xl) var(--spacing-2xl);
+    padding: var(--spacing-xl) 0;
     border-top: 1px solid var(--border-light);
     margin-top: 0;
     display: flex;
@@ -1127,7 +1127,7 @@ body {
     
     /* STICKY BUTTONS: Mobile responsive adjustments for sticky buttons */
     .profile-actions {
-        padding: var(--spacing-lg);
+        padding: var(--spacing-lg) 0;
         flex-direction: column;
         align-items: center;
     }
