@@ -1,4 +1,4 @@
-// Enhanced Speech Manager with Improved Voice Input Experience
+// Hold-to-Speak Speech Manager with Auto-Send
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -9,13 +9,11 @@ class SpeechManager {
         this.bestVoice = null;
         this.currentAudio = null;
         
-        // Enhanced voice input properties
-        this.isRecording = false;
+        // Hold-to-speak properties
+        this.isHolding = false;
         this.interimTranscript = '';
         this.finalTranscript = '';
-        this.silenceTimer = null;
         this.recordingStartTime = null;
-        this.hasClicked = false;
         
         // Voice settings - 0: Mute, 1: Female, 2: Male
         this.voiceMode = TalbotConfig.DEVELOPMENT_MODE ? TalbotConfig.DEV_VOICE_MODE : 0;
@@ -365,7 +363,7 @@ class SpeechManager {
         }
     }
 
-    // Enhanced Speech Recognition Setup
+    // Hold-to-Speak Speech Recognition Setup
     initializeSpeech() {
         this.initializeSpeechRecognition();
         this.initializeSpeechSynthesis();
@@ -376,22 +374,21 @@ class SpeechManager {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
             
-            // Enhanced settings for better user experience
-            this.recognition.continuous = true;        // Keep listening through pauses
+            // Hold-to-speak settings
+            this.recognition.continuous = true;        // Keep listening while held
             this.recognition.interimResults = true;    // Show live transcription
             this.recognition.lang = 'en-AU';
             this.recognition.maxAlternatives = 1;
             
             this.recognition.onstart = () => {
                 this.isListening = true;
-                this.isRecording = true;
                 this.recordingStartTime = Date.now();
                 this.interimTranscript = '';
                 this.finalTranscript = '';
                 this.updateVoiceButton();
-                this.updateStatus('Listening... (tap again to stop)', '👂');
+                this.updateStatus('Listening... (hold button)', '👂');
                 this.updateMessageInputPlaceholder('Listening...');
-                console.log('🎤 Voice recognition started');
+                console.log('🎤 Hold-to-speak started');
             };
             
             this.recognition.onresult = (event) => {
@@ -416,10 +413,7 @@ class SpeechManager {
                 this.messageInput.style.height = 'auto';
                 this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
                 
-                // Reset silence timer on new speech
-                this.resetSilenceTimer();
-                
-                console.log('🎤 Transcription:', fullTranscript);
+                console.log('🎤 Live transcription:', fullTranscript);
             };
             
             this.recognition.onerror = (event) => {
@@ -428,32 +422,16 @@ class SpeechManager {
                 if (event.error === 'not-allowed') {
                     this.showError('Microphone access denied. Please allow microphone permissions and try again.');
                 } else if (event.error === 'no-speech') {
-                    this.showVoiceStatus('No speech detected. Try speaking closer to your microphone.', false);
+                    // Don't show error for no speech in hold-to-speak mode
+                    console.log('No speech detected while holding');
                 } else {
                     this.showError('Voice recognition error. Please try again.');
                 }
-                
-                this.stopListening();
             };
             
             this.recognition.onend = () => {
-                if (this.isRecording) {
-                    // If we're still supposed to be recording, restart (for continuous listening)
-                    console.log('🎤 Recognition ended, but still recording - restarting...');
-                    setTimeout(() => {
-                        if (this.isRecording) {
-                            try {
-                                this.recognition.start();
-                            } catch (error) {
-                                console.log('Recognition restart failed:', error);
-                                this.stopListening();
-                            }
-                        }
-                    }, 100);
-                } else {
-                    console.log('🎤 Voice recognition ended');
-                    this.finalizeRecording();
-                }
+                console.log('🎤 Speech recognition ended');
+                this.finalizeHoldToSpeak();
             };
             
         } else {
@@ -508,7 +486,7 @@ class SpeechManager {
         return bestVoice;
     }
 
-    // Enhanced Event Binding
+    // Hold-to-Speak Event Binding
     bindEvents() {
         // Voice settings button (collapsible)
         if (this.voiceSettingsButton) {
@@ -533,59 +511,58 @@ class SpeechManager {
             });
         }
 
-        // Enhanced Voice button events - now tap to start/stop
+        // Hold-to-Speak Voice button events
         if (this.voiceButton) {
-            // Click event for desktop
-            this.voiceButton.addEventListener('click', (e) => {
+            // Mouse events for desktop
+            this.voiceButton.addEventListener('mousedown', (e) => {
                 e.preventDefault();
-                this.hasClicked = true;
-                this.toggleListening();
+                this.startHoldToSpeak();
             });
             
-            // Touch event for mobile but avoid double-triggering
+            this.voiceButton.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                this.stopHoldToSpeak();
+            });
+            
+            this.voiceButton.addEventListener('mouseleave', (e) => {
+                // Stop if they drag mouse away while holding
+                this.stopHoldToSpeak();
+            });
+            
+            // Touch events for mobile
+            this.voiceButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.startHoldToSpeak();
+            });
+            
             this.voiceButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                // Only trigger if click hasn't already been handled
-                if (!this.hasClicked) {
-                    this.toggleListening();
-                }
-                // Reset flag after a short delay
-                setTimeout(() => {
-                    this.hasClicked = false;
-                }, 100);
+                this.stopHoldToSpeak();
+            });
+            
+            this.voiceButton.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                this.stopHoldToSpeak();
             });
         }
         
         // Stop speech when typing manually
         if (this.messageInput) {
             this.messageInput.addEventListener('input', (e) => {
-                // Only stop speaking, don't stop listening (user might want to continue dictating)
+                // Stop speaking if Talbot is talking
                 if (this.isSpeaking) {
                     this.stopSpeaking();
-                }
-                
-                // If they're typing manually while recording, stop recording
-                if (this.isListening && !this.isRecording) {
-                    // This means they started typing after recording finished
-                    // Reset the placeholder
-                    this.updateMessageInputPlaceholder();
                 }
             });
         }
     }
 
-    // New Enhanced Voice Input Methods
+    // Hold-to-Speak Methods
 
-    toggleListening() {
-        if (this.isListening) {
-            this.stopListening();
-        } else {
-            this.startListening();
-        }
-    }
-
-    startListening() {
-        if (!this.recognition || this.isListening) return;
+    startHoldToSpeak() {
+        if (!this.recognition || this.isListening || this.isHolding) return;
+        
+        this.isHolding = true;
         
         try {
             // Clear any existing content
@@ -593,34 +570,33 @@ class SpeechManager {
             this.finalTranscript = '';
             this.interimTranscript = '';
             
-            console.log('🎤 Starting enhanced voice recognition...');
+            console.log('🎤 Starting hold-to-speak...');
             this.recognition.start();
             
         } catch (error) {
             console.error('Failed to start voice recognition:', error);
             this.showError('Could not start voice recognition. Please try again.');
+            this.isHolding = false;
         }
     }
 
-    stopListening() {
-        if (!this.recognition || !this.isListening) return;
+    stopHoldToSpeak() {
+        if (!this.isHolding) return;
         
-        console.log('🎤 Stopping voice recognition...');
-        this.isRecording = false; // This will prevent restart in onend
+        this.isHolding = false;
+        
+        console.log('🎤 Stopping hold-to-speak...');
         
         try {
             this.recognition.stop();
         } catch (error) {
             console.log('Recognition already stopped');
         }
-        
-        this.clearSilenceTimer();
-        this.finalizeRecording();
     }
 
-    finalizeRecording() {
+    finalizeHoldToSpeak() {
         this.isListening = false;
-        this.isRecording = false;
+        this.isHolding = false;
         this.updateVoiceButton();
         
         const finalText = this.messageInput.value.trim();
@@ -630,19 +606,22 @@ class SpeechManager {
             const duration = this.recordingStartTime ? 
                 Math.round((Date.now() - this.recordingStartTime) / 1000) : 0;
             
-            this.updateStatus(`Recorded ${duration}s - Review your message`, '✅');
-            this.updateMessageInputPlaceholder('Review and edit your message, then press send');
+            this.updateStatus(`Sending message... (${duration}s recorded)`, '📤');
+            console.log(`🎤 Auto-sending: "${finalText}" (${duration}s)`);
             
-            // Focus on input so user can edit if needed
-            this.messageInput.focus();
+            // Auto-send the message
+            this.onSpeechResult?.(finalText);
             
-            // Position cursor at end
-            this.messageInput.setSelectionRange(finalText.length, finalText.length);
-            
-            console.log(`🎤 Recording completed: "${finalText}" (${duration}s)`);
+            // Clear the input after sending
+            setTimeout(() => {
+                this.messageInput.value = '';
+                this.messageInput.style.height = 'auto';
+                this.updateMessageInputPlaceholder();
+                this.updateStatus('Ready to listen', '💙');
+            }, 500);
             
         } else {
-            this.updateStatus('No speech detected - try again', '❌');
+            this.updateStatus('No speech detected', '❌');
             this.updateMessageInputPlaceholder();
             
             setTimeout(() => {
@@ -654,26 +633,6 @@ class SpeechManager {
         this.finalTranscript = '';
         this.interimTranscript = '';
         this.recordingStartTime = null;
-    }
-
-    // Silence Detection
-    resetSilenceTimer() {
-        this.clearSilenceTimer();
-        
-        // After 3 seconds of silence, stop recording
-        this.silenceTimer = setTimeout(() => {
-            if (this.isRecording && this.finalTranscript.trim()) {
-                console.log('🎤 Silence detected, finalizing recording...');
-                this.stopListening();
-            }
-        }, 3000);
-    }
-
-    clearSilenceTimer() {
-        if (this.silenceTimer) {
-            clearTimeout(this.silenceTimer);
-            this.silenceTimer = null;
-        }
     }
 
     // UI Helper Methods
@@ -688,11 +647,11 @@ class SpeechManager {
             if (width <= 360) {
                 this.messageInput.placeholder = "What's on your mind?";
             } else if (width <= 480) {
-                this.messageInput.placeholder = "What's on your mind? Tap mic to speak";
+                this.messageInput.placeholder = "What's on your mind? Hold mic to speak";
             } else if (width <= 768) {
-                this.messageInput.placeholder = "What's on your mind? Tap mic to speak";
+                this.messageInput.placeholder = "What's on your mind? Hold mic to speak";
             } else {
-                this.messageInput.placeholder = "What's on your mind? Type or tap the mic to speak...";
+                this.messageInput.placeholder = "What's on your mind? Type or hold the mic to speak...";
             }
         }
     }
@@ -705,13 +664,13 @@ class SpeechManager {
         if (this.isListening) {
             this.voiceButton.classList.add('listening');
             this.voiceButton.innerHTML = '⏹️';
-            this.voiceButton.title = 'Tap to stop recording';
+            this.voiceButton.title = 'Hold to record - Release to send';
         } else if (this.isSpeaking) {
             this.voiceButton.classList.add('speaking');
             this.voiceButton.innerHTML = '🔊';
             this.voiceButton.title = 'Talbot is speaking';
         } else {
-            // Clear any existing content first
+            // Clear button first
             this.voiceButton.innerHTML = '';
             
             // Create and configure the image element
@@ -732,7 +691,7 @@ class SpeechManager {
             
             // Add the image to the button
             this.voiceButton.appendChild(micIcon);
-            this.voiceButton.title = 'Tap to start voice recording';
+            this.voiceButton.title = 'Hold to record voice message';
         }
     }
 
@@ -902,5 +861,16 @@ class SpeechManager {
         
         const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode)' : '';
         this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
+    }
+
+    // Legacy methods for backward compatibility
+    startListening() {
+        // Legacy method - now just starts hold-to-speak
+        this.startHoldToSpeak();
+    }
+
+    stopListening() {
+        // Legacy method - now just stops hold-to-speak
+        this.stopHoldToSpeak();
     }
 }
