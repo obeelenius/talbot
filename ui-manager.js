@@ -5,22 +5,34 @@ class UIManager {
         this.isTyping = false;
         this.speechManager = null;
         
-        // Duplicate prevention flags
+        // Duplicate prevention flags with unique IDs to track sources
         this.isProcessingSend = false;
         this.lastSendTime = 0;
         this.preventDuplicateTimeout = null;
+        this.messageProcessingId = null;
         
         // Event handler bindings - store references to avoid duplication
         this._boundSendClick = null;
         this._boundKeyDown = null;
         this._boundInput = null;
         
+        // Flag to track initialization
+        this.isInitialized = false;
+        
         this.initializeElements();
         this.loadChatHistory();
+        
+        // Initialize speech manager after elements are set up
         this.initializeSpeechManager();
+        
+        // Ensure previous event listeners are removed
+        this.unbindEvents();
         
         // Bind events AFTER everything else is initialized
         this.bindEvents();
+        
+        // Mark as initialized
+        this.isInitialized = true;
         
         console.log('UIManager initialized with enhanced duplicate prevention');
     }
@@ -30,6 +42,9 @@ class UIManager {
         this.messageInput = document.getElementById('message-input');
         this.sendButton = document.getElementById('send-button');
         this.typingIndicator = document.getElementById('typing-indicator');
+        
+        // Log initialization to help debug
+        console.log('UI elements initialized');
     }
 
     initializeSpeechManager() {
@@ -58,16 +73,19 @@ class UIManager {
         if (this.sendButton) {
             this._boundSendClick = this.handleSendButtonClick.bind(this);
             this.sendButton.addEventListener('click', this._boundSendClick);
+            console.log('🔄 Send button click listener bound');
         }
 
         // Enter key to send with enhanced duplicate prevention
         if (this.messageInput) {
             this._boundKeyDown = this.handleInputKeyDown.bind(this);
             this.messageInput.addEventListener('keydown', this._boundKeyDown);
+            console.log('🔄 Message input keydown listener bound');
             
             // Auto-resize textarea and notify speech manager on input
             this._boundInput = this.handleInputChange.bind(this);
             this.messageInput.addEventListener('input', this._boundInput);
+            console.log('🔄 Message input change listener bound');
         }
         
         console.log('✅ UI events bound with enhanced duplicate prevention');
@@ -75,31 +93,92 @@ class UIManager {
     
     // Method to remove event listeners (to prevent duplicates)
     unbindEvents() {
-        if (this.sendButton && this._boundSendClick) {
-            this.sendButton.removeEventListener('click', this._boundSendClick);
+        console.log('🧹 Cleaning up previous UI event listeners...');
+        
+        if (this.sendButton) {
+            // Remove all click handlers to be safe
+            const oldClickHandler = this._boundSendClick;
+            if (oldClickHandler) {
+                this.sendButton.removeEventListener('click', oldClickHandler);
+            }
+            
+            // Also try removing any other potential handlers
+            const possibleHandlers = this.sendButton._boundHandlers || [];
+            possibleHandlers.forEach(handler => {
+                try {
+                    this.sendButton.removeEventListener('click', handler);
+                } catch (e) {
+                    // Ignore errors
+                }
+            });
+            
+            // Clone and replace the button to ensure all handlers are removed
+            if (this.sendButton.parentNode) {
+                const newButton = this.sendButton.cloneNode(true);
+                this.sendButton.parentNode.replaceChild(newButton, this.sendButton);
+                this.sendButton = newButton;
+            }
+            
+            console.log('🧹 Send button click listeners removed and element replaced');
         }
         
-        if (this.messageInput && this._boundKeyDown) {
-            this.messageInput.removeEventListener('keydown', this._boundKeyDown);
+        if (this.messageInput) {
+            // Remove keydown handlers
+            const oldKeyDownHandler = this._boundKeyDown;
+            if (oldKeyDownHandler) {
+                this.messageInput.removeEventListener('keydown', oldKeyDownHandler);
+            }
+            
+            // Remove input handlers
+            const oldInputHandler = this._boundInput;
+            if (oldInputHandler) {
+                this.messageInput.removeEventListener('input', oldInputHandler);
+            }
+            
+            // Also try removing any other potential handlers
+            const possibleHandlers = this.messageInput._boundHandlers || [];
+            possibleHandlers.forEach(handler => {
+                try {
+                    this.messageInput.removeEventListener('keydown', handler);
+                    this.messageInput.removeEventListener('input', handler);
+                } catch (e) {
+                    // Ignore errors
+                }
+            });
+            
+            // We don't clone the input element as it would lose its current content
+            
+            console.log('🧹 Message input keydown and input listeners removed');
         }
         
-        if (this.messageInput && this._boundInput) {
-            this.messageInput.removeEventListener('input', this._boundInput);
-        }
+        // Reset handler references
+        this._boundSendClick = null;
+        this._boundKeyDown = null;
+        this._boundInput = null;
     }
     
     // Event handlers with proper binding
     handleSendButtonClick(e) {
         e.preventDefault();
         e.stopPropagation();
-        this.processSendMessage('button_click');
+        
+        // Generate unique ID for this click event
+        const clickId = `click_${Date.now()}`;
+        console.log(`👆 Send button clicked (ID: ${clickId})`);
+        
+        this.processSendMessage('button_click', clickId);
     }
     
     handleInputKeyDown(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             e.stopPropagation();
-            this.processSendMessage('enter_key');
+            
+            // Generate unique ID for this key event
+            const keyId = `key_${Date.now()}`;
+            console.log(`⌨️ Enter key pressed (ID: ${keyId})`);
+            
+            this.processSendMessage('enter_key', keyId);
         }
     }
     
@@ -112,21 +191,21 @@ class UIManager {
         }
     }
 
-    // Enhanced duplicate prevention with robust timeouts
-    processSendMessage(source) {
+    // Enhanced duplicate prevention with robust timeouts and unique event IDs
+    processSendMessage(source, eventId) {
         const now = Date.now();
         
         // Log attempt for debugging
-        console.log(`🔄 Send attempt from: ${source}, processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms`);
+        console.log(`🔄 Send attempt from: ${source} (ID: ${eventId}), processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms, current process ID: ${this.messageProcessingId}`);
         
         // Multiple layers of duplicate prevention
         if (this.isProcessingSend) {
-            console.log(`🛑 BLOCKED: Already processing a send operation (${source})`);
+            console.log(`🛑 BLOCKED: Already processing a send operation (${source}, ID: ${eventId})`);
             return;
         }
         
         if (now - this.lastSendTime < 800) {
-            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source})`);
+            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source}, ID: ${eventId})`);
             return;
         }
         
@@ -140,6 +219,7 @@ class UIManager {
         // Set flags immediately to prevent race conditions
         this.isProcessingSend = true;
         this.lastSendTime = now;
+        this.messageProcessingId = eventId;
         
         // Clear any existing timeout
         if (this.preventDuplicateTimeout) {
@@ -147,19 +227,20 @@ class UIManager {
         }
         
         // Execute the send operation
-        this.executeMessageSend(message, source);
+        this.executeMessageSend(message, source, eventId);
         
         // Set a timeout to release the lock (failsafe)
         this.preventDuplicateTimeout = setTimeout(() => {
             if (this.isProcessingSend) {
-                console.log('🔓 Releasing processing lock (timeout)');
+                console.log(`🔓 Releasing processing lock (timeout, ID: ${this.messageProcessingId})`);
                 this.isProcessingSend = false;
+                this.messageProcessingId = null;
             }
         }, 3000); // 3 seconds max lock
     }
     
-    executeMessageSend(message, source) {
-        console.log(`📤 Sending message from ${source}:`, message.substring(0, 30) + (message.length > 30 ? '...' : ''));
+    executeMessageSend(message, source, eventId) {
+        console.log(`📤 Sending message from ${source} (ID: ${eventId}):`, message.substring(0, 30) + (message.length > 30 ? '...' : ''));
         
         try {
             // Clear input field immediately to prevent re-submission
@@ -180,8 +261,9 @@ class UIManager {
         } finally {
             // Always release the processing lock after a short delay
             setTimeout(() => {
-                console.log('🔓 Releasing processing lock (completed)');
+                console.log(`🔓 Releasing processing lock (completed, ID: ${this.messageProcessingId})`);
                 this.isProcessingSend = false;
+                this.messageProcessingId = null;
             }, 500); // Short delay to prevent immediate re-sends
         }
     }
@@ -190,10 +272,12 @@ class UIManager {
         // Handle voice input from speech manager
         if (!text) return;
         
-        console.log('🎤 Voice input received');
+        // Generate unique ID for voice input
+        const voiceId = `voice_${Date.now()}`;
+        console.log(`🎤 Voice input received (ID: ${voiceId})`);
         
         // Use the same duplicate prevention mechanism for voice input
-        this.processSendMessage('voice_input');
+        this.processSendMessage('voice_input', voiceId);
     }
 
     async getAIResponse(message) {
