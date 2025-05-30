@@ -37,6 +37,7 @@ class UIManager {
         }
     }
 
+    // FIXED: Updated to integrate with Speech Manager properly and prevent duplicate listeners
     bindEvents() {
         // Send button
         if (this.sendButton) {
@@ -52,8 +53,15 @@ class UIManager {
                 }
             });
 
-            // Auto-resize textarea
-            this.messageInput.addEventListener('input', () => this.autoResizeTextarea());
+            // Auto-resize textarea AND notify speech manager
+            this.messageInput.addEventListener('input', () => {
+                this.autoResizeTextarea();
+                
+                // Notify speech manager that user is typing (stop speech if needed)
+                if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
+                    this.speechManager.handleUserTyping();
+                }
+            });
         }
     }
 
