@@ -69,13 +69,10 @@ class TalbotApp {
     }
 
     initializeAppState() {
-        // Check if user has a profile
-        if (!this.profileManager.hasProfile()) {
-            this.showProfilePrompt();
-        }
-
+        // NO MORE ANNOYING POPUP - just quietly initialize
+        
         // Show conversation memory notice if applicable
-        if (this.conversationManager.hasConversationMemory()) {
+        if (this.conversationManager && this.conversationManager.hasConversationMemory()) {
             this.showConversationMemoryNotice();
         }
 
@@ -84,21 +81,6 @@ class TalbotApp {
         
         // Set up periodic health checks
         this.setupHealthChecks();
-    }
-
-    showProfilePrompt() {
-        // Show a gentle prompt to set up profile
-        setTimeout(() => {
-            const shouldSetupProfile = confirm(
-                "Welcome to Talbot!\n\n" +
-                "Would you like to set up your profile? This helps me provide more personalized support.\n\n" +
-                "You can always do this later by clicking the profile button."
-            );
-            
-            if (shouldSetupProfile) {
-                this.profileManager.openProfileModal();
-            }
-        }, 2000); // Show after 2 seconds
     }
 
     showConversationMemoryNotice() {
@@ -133,8 +115,17 @@ class TalbotApp {
     }
 
     setupErrorHandling() {
-        // Global error handler
+        // Global error handler with better filtering
         window.addEventListener('error', (event) => {
+            // Filter out extension and unimportant errors
+            if (event.filename && (
+                event.filename.includes('chrome-extension://') ||
+                event.filename.includes('moz-extension://') ||
+                event.filename.includes('extension')
+            )) {
+                return; // Ignore extension errors
+            }
+            
             console.error('Global error:', event.error);
             this.handleGlobalError(event.error);
         });
@@ -147,21 +138,26 @@ class TalbotApp {
     }
 
     handleGlobalError(error) {
-        // Log error details for debugging
-        const errorInfo = {
-            message: error.message || 'Unknown error',
-            stack: error.stack || 'No stack trace',
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            url: window.location.href
-        };
+        // Only show error notification for critical errors
+        if (error && error.message && !error.message.includes('extension')) {
+            // Log error details for debugging
+            const errorInfo = {
+                message: error.message || 'Unknown error',
+                stack: error.stack || 'No stack trace',
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                url: window.location.href
+            };
 
-        console.error('Talbot Error [Global Error]:', errorInfo);
+            console.error('Talbot Error [Global Error]:', errorInfo);
 
-        // Show user-friendly error message
-        this.showErrorNotification(
-            "I'm experiencing a technical issue. Please refresh the page if problems persist."
-        );
+            // Only show user-friendly error message for serious issues
+            if (error.message.includes('TypeError') || error.message.includes('ReferenceError')) {
+                this.showErrorNotification(
+                    "I'm experiencing a technical issue. Please refresh the page if problems persist."
+                );
+            }
+        }
     }
 
     setupHealthChecks() {
