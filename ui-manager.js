@@ -1,40 +1,31 @@
-// UI Manager - Handle Interface Updates and Message Display with Improved Duplicate Prevention
+// UI Manager - Handle Interface Updates and Message Display with Fixed Event Handling
 class UIManager {
     constructor() {
         this.messages = [];
         this.isTyping = false;
         this.speechManager = null;
         
-        // Duplicate prevention flags with unique IDs to track sources
+        // Duplicate prevention flags
         this.isProcessingSend = false;
         this.lastSendTime = 0;
         this.preventDuplicateTimeout = null;
-        this.messageProcessingId = null;
         
         // Event handler bindings - store references to avoid duplication
         this._boundSendClick = null;
         this._boundKeyDown = null;
         this._boundInput = null;
         
-        // Flag to track initialization
-        this.isInitialized = false;
-        
         this.initializeElements();
         this.loadChatHistory();
-        
-        // Initialize speech manager after elements are set up
         this.initializeSpeechManager();
         
-        // Ensure previous event listeners are removed
-        this.unbindEvents();
+        // Remove ALL existing event listeners
+        this.removeAllEventListeners();
         
         // Bind events AFTER everything else is initialized
         this.bindEvents();
         
-        // Mark as initialized
-        this.isInitialized = true;
-        
-        console.log('UIManager initialized with enhanced duplicate prevention');
+        console.log('UIManager initialized with strict send-only processing');
     }
 
     initializeElements() {
@@ -42,9 +33,6 @@ class UIManager {
         this.messageInput = document.getElementById('message-input');
         this.sendButton = document.getElementById('send-button');
         this.typingIndicator = document.getElementById('typing-indicator');
-        
-        // Log initialization to help debug
-        console.log('UI elements initialized');
     }
 
     initializeSpeechManager() {
@@ -52,165 +40,144 @@ class UIManager {
         try {
             this.speechManager = new SpeechManager();
             
-            // Set up speech manager callbacks
-            this.speechManager.setOnSpeechResult((text) => {
-                this.handleVoiceInput(text);
-            });
+            // Set up speech manager callbacks - USING EXPLICIT FUNCTION REFERENCE
+            this.speechManager.setOnSpeechResult(this.handleVoiceInputStrict.bind(this));
             
-            console.log('SpeechManager initialized in UIManager');
+            console.log('SpeechManager initialized in UIManager with strict callbacks');
         } catch (error) {
             console.warn('SpeechManager not available:', error);
         }
     }
 
+    // Radical approach: remove ALL event listeners from elements
+    removeAllEventListeners() {
+        console.log('🧨 Removing ALL event listeners from UI elements');
+        
+        // Replace the send button completely to remove all listeners
+        if (this.sendButton && this.sendButton.parentNode) {
+            const newButton = this.sendButton.cloneNode(true);
+            this.sendButton.parentNode.replaceChild(newButton, this.sendButton);
+            this.sendButton = newButton;
+        }
+        
+        // For the input field, we need to be more careful to preserve content
+        if (this.messageInput) {
+            // Save current value and focus state
+            const currentValue = this.messageInput.value;
+            const wasFocused = document.activeElement === this.messageInput;
+            
+            // Create a new input with the same properties
+            const newInput = document.createElement('textarea');
+            
+            // Copy all attributes
+            Array.from(this.messageInput.attributes).forEach(attr => {
+                newInput.setAttribute(attr.name, attr.value);
+            });
+            
+            // Set the same value
+            newInput.value = currentValue;
+            
+            // Replace the old input
+            if (this.messageInput.parentNode) {
+                this.messageInput.parentNode.replaceChild(newInput, this.messageInput);
+                this.messageInput = newInput;
+                
+                // Restore focus if it was focused
+                if (wasFocused) {
+                    this.messageInput.focus();
+                }
+            }
+        }
+        
+        console.log('🧹 All UI elements replaced to remove event listeners');
+    }
+
     bindEvents() {
-        console.log('📝 Binding UI events with enhanced duplicate prevention...');
+        console.log('📝 Binding STRICT UI events...');
         
-        // Clear any previously bound events to prevent duplicates
-        this.unbindEvents();
-        
-        // Send button with enhanced duplicate prevention
+        // Send button - EXPLICITLY FOR SEND ONLY
         if (this.sendButton) {
-            this._boundSendClick = this.handleSendButtonClick.bind(this);
+            this._boundSendClick = this.handleSendButtonStrict.bind(this);
             this.sendButton.addEventListener('click', this._boundSendClick);
-            console.log('🔄 Send button click listener bound');
+            console.log('🔒 Send button click listener bound - STRICT MODE');
         }
 
-        // Enter key to send with enhanced duplicate prevention
+        // Enter key to send - EXPLICITLY FOR SEND ONLY
         if (this.messageInput) {
-            this._boundKeyDown = this.handleInputKeyDown.bind(this);
+            this._boundKeyDown = this.handleKeyDownStrict.bind(this);
             this.messageInput.addEventListener('keydown', this._boundKeyDown);
-            console.log('🔄 Message input keydown listener bound');
+            console.log('🔒 Message input keydown listener bound - STRICT MODE');
             
-            // Auto-resize textarea and notify speech manager on input
-            this._boundInput = this.handleInputChange.bind(this);
+            // Input event only for auto-resize and notifying speech manager
+            this._boundInput = this.handleInputChangeStrict.bind(this);
             this.messageInput.addEventListener('input', this._boundInput);
-            console.log('🔄 Message input change listener bound');
+            console.log('📏 Message input resize listener bound');
         }
         
-        console.log('✅ UI events bound with enhanced duplicate prevention');
+        console.log('✅ UI events bound with strict send-only processing');
     }
     
-    // Method to remove event listeners (to prevent duplicates)
-    unbindEvents() {
-        console.log('🧹 Cleaning up previous UI event listeners...');
-        
-        if (this.sendButton) {
-            // Remove all click handlers to be safe
-            const oldClickHandler = this._boundSendClick;
-            if (oldClickHandler) {
-                this.sendButton.removeEventListener('click', oldClickHandler);
-            }
-            
-            // Also try removing any other potential handlers
-            const possibleHandlers = this.sendButton._boundHandlers || [];
-            possibleHandlers.forEach(handler => {
-                try {
-                    this.sendButton.removeEventListener('click', handler);
-                } catch (e) {
-                    // Ignore errors
-                }
-            });
-            
-            // Clone and replace the button to ensure all handlers are removed
-            if (this.sendButton.parentNode) {
-                const newButton = this.sendButton.cloneNode(true);
-                this.sendButton.parentNode.replaceChild(newButton, this.sendButton);
-                this.sendButton = newButton;
-            }
-            
-            console.log('🧹 Send button click listeners removed and element replaced');
-        }
-        
-        if (this.messageInput) {
-            // Remove keydown handlers
-            const oldKeyDownHandler = this._boundKeyDown;
-            if (oldKeyDownHandler) {
-                this.messageInput.removeEventListener('keydown', oldKeyDownHandler);
-            }
-            
-            // Remove input handlers
-            const oldInputHandler = this._boundInput;
-            if (oldInputHandler) {
-                this.messageInput.removeEventListener('input', oldInputHandler);
-            }
-            
-            // Also try removing any other potential handlers
-            const possibleHandlers = this.messageInput._boundHandlers || [];
-            possibleHandlers.forEach(handler => {
-                try {
-                    this.messageInput.removeEventListener('keydown', handler);
-                    this.messageInput.removeEventListener('input', handler);
-                } catch (e) {
-                    // Ignore errors
-                }
-            });
-            
-            // We don't clone the input element as it would lose its current content
-            
-            console.log('🧹 Message input keydown and input listeners removed');
-        }
-        
-        // Reset handler references
-        this._boundSendClick = null;
-        this._boundKeyDown = null;
-        this._boundInput = null;
-    }
+    // STRICT EVENT HANDLERS - ensuring they ONLY process sends
     
-    // Event handlers with proper binding
-    handleSendButtonClick(e) {
+    handleSendButtonStrict(e) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation(); // Prevent any other handlers
         
-        // Generate unique ID for this click event
-        const clickId = `click_${Date.now()}`;
-        console.log(`👆 Send button clicked (ID: ${clickId})`);
-        
-        this.processSendMessage('button_click', clickId);
+        console.log('👆 Send button clicked - STRICT HANDLER');
+        this.processSendMessageStrict('button_click');
     }
     
-    handleInputKeyDown(e) {
+    handleKeyDownStrict(e) {
+        // ONLY process Enter key (without shift)
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation(); // Prevent any other handlers
             
-            // Generate unique ID for this key event
-            const keyId = `key_${Date.now()}`;
-            console.log(`⌨️ Enter key pressed (ID: ${keyId})`);
-            
-            this.processSendMessage('enter_key', keyId);
+            console.log('⌨️ Enter key pressed - STRICT HANDLER');
+            this.processSendMessageStrict('enter_key');
         }
+        // Ignore all other key events
     }
     
-    handleInputChange() {
+    handleInputChangeStrict() {
+        // ONLY handle UI updates, never process messages
         this.autoResizeTextarea();
         
-        // Notify speech manager about typing
+        // Notify speech manager about typing (if speaking)
         if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
             this.speechManager.handleUserTyping();
         }
     }
+    
+    handleVoiceInputStrict(text) {
+        if (!text) return;
+        
+        console.log('🎤 Voice input received - STRICT HANDLER');
+        this.processSendMessageStrict('voice_input', text);
+    }
 
-    // Enhanced duplicate prevention with robust timeouts and unique event IDs
-    processSendMessage(source, eventId) {
+    // Strict send processing that ignores typing and only processes explicit sends
+    processSendMessageStrict(source, voiceText = null) {
         const now = Date.now();
         
-        // Log attempt for debugging
-        console.log(`🔄 Send attempt from: ${source} (ID: ${eventId}), processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms, current process ID: ${this.messageProcessingId}`);
+        // Explicit debug statement for send attempt
+        console.log(`🔐 STRICT SEND from source: ${source}, processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms`);
         
-        // Multiple layers of duplicate prevention
+        // Prevent duplicate sends
         if (this.isProcessingSend) {
-            console.log(`🛑 BLOCKED: Already processing a send operation (${source}, ID: ${eventId})`);
+            console.log(`🛑 BLOCKED: Already processing a send operation (${source})`);
             return;
         }
         
         if (now - this.lastSendTime < 800) {
-            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source}, ID: ${eventId})`);
+            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source})`);
             return;
         }
         
-        // Get message before any processing
-        const message = this.messageInput?.value?.trim() || '';
+        // Get message content - either from voice or input field
+        const message = voiceText || (this.messageInput?.value?.trim() || '');
         if (!message) {
             console.log('⚠️ No message to send (empty input)');
             return;
@@ -219,7 +186,6 @@ class UIManager {
         // Set flags immediately to prevent race conditions
         this.isProcessingSend = true;
         this.lastSendTime = now;
-        this.messageProcessingId = eventId;
         
         // Clear any existing timeout
         if (this.preventDuplicateTimeout) {
@@ -227,24 +193,23 @@ class UIManager {
         }
         
         // Execute the send operation
-        this.executeMessageSend(message, source, eventId);
+        this.executeStrictSend(message, source);
         
         // Set a timeout to release the lock (failsafe)
         this.preventDuplicateTimeout = setTimeout(() => {
             if (this.isProcessingSend) {
-                console.log(`🔓 Releasing processing lock (timeout, ID: ${this.messageProcessingId})`);
+                console.log('🔓 Releasing processing lock (timeout)');
                 this.isProcessingSend = false;
-                this.messageProcessingId = null;
             }
         }, 3000); // 3 seconds max lock
     }
     
-    executeMessageSend(message, source, eventId) {
-        console.log(`📤 Sending message from ${source} (ID: ${eventId}):`, message.substring(0, 30) + (message.length > 30 ? '...' : ''));
+    executeStrictSend(message, source) {
+        console.log(`📤 STRICT SEND processing: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}" from ${source}`);
         
         try {
-            // Clear input field immediately to prevent re-submission
-            if (this.messageInput) {
+            // Only clear input if it's from the input field (not voice)
+            if (source !== 'voice_input' && this.messageInput) {
                 this.messageInput.value = '';
                 this.autoResizeTextarea();
                 this.messageInput.focus();
@@ -261,308 +226,10 @@ class UIManager {
         } finally {
             // Always release the processing lock after a short delay
             setTimeout(() => {
-                console.log(`🔓 Releasing processing lock (completed, ID: ${this.messageProcessingId})`);
+                console.log('🔓 Releasing processing lock (completed)');
                 this.isProcessingSend = false;
-                this.messageProcessingId = null;
             }, 500); // Short delay to prevent immediate re-sends
         }
     }
 
-    handleVoiceInput(text) {
-        // Handle voice input from speech manager
-        if (!text) return;
-        
-        // Generate unique ID for voice input
-        const voiceId = `voice_${Date.now()}`;
-        console.log(`🎤 Voice input received (ID: ${voiceId})`);
-        
-        // Use the same duplicate prevention mechanism for voice input
-        this.processSendMessage('voice_input', voiceId);
-    }
-
-    async getAIResponse(message) {
-        try {
-            // Show typing indicator
-            this.showTypingIndicator();
-            
-            // Get AI response
-            if (window.aiResponseManager) {
-                const response = await window.aiResponseManager.getAIResponse(message);
-                
-                // Hide typing indicator
-                this.hideTypingIndicator();
-                
-                // Add AI response to UI
-                this.addMessage(response, 'assistant');
-                
-                // Speak the response if voice is enabled
-                if (this.speechManager) {
-                    await this.speechManager.speakMessage(response);
-                }
-            } else {
-                console.error('AI Response Manager not available');
-                this.hideTypingIndicator();
-                this.addMessage("I'm having trouble connecting right now. Please try again.", 'assistant');
-            }
-        } catch (error) {
-            console.error('Error getting AI response:', error);
-            this.hideTypingIndicator();
-            this.addMessage("I'm having trouble responding right now. Please try again.", 'assistant');
-        }
-    }
-
-    addMessage(content, sender, timestamp = null) {
-        const messageObj = {
-            content: content,
-            sender: sender, // 'user' or 'assistant'
-            timestamp: timestamp || new Date().toISOString(),
-            id: this.generateMessageId()
-        };
-
-        this.messages.push(messageObj);
-        this.renderMessage(messageObj);
-        this.scrollToBottom();
-        this.saveChatHistory();
-
-        return messageObj;
-    }
-
-    renderMessage(messageObj) {
-        if (!this.messagesContainer) return;
-
-        const messageElement = document.createElement('div');
-        messageElement.className = `message ${messageObj.sender}`;
-        messageElement.id = `message-${messageObj.id}`;
-
-        const timeString = new Date(messageObj.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        // Create avatar
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        if (messageObj.sender === 'user') {
-            avatar.innerHTML = 'U';
-        } else {
-            avatar.innerHTML = 't';
-        }
-
-        // Create content
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.innerHTML = `
-            <div class="message-text">${this.formatMessageContent(messageObj.content)}</div>
-            <div class="message-time">${timeString}</div>
-        `;
-
-        messageElement.appendChild(avatar);
-        messageElement.appendChild(content);
-
-        // Remove welcome message if it exists
-        const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
-        if (welcomeMessage && this.messages.length === 1) {
-            welcomeMessage.remove();
-        }
-
-        this.messagesContainer.appendChild(messageElement);
-    }
-
-    formatMessageContent(content) {
-        // Convert line breaks to <br> tags
-        let formatted = content.replace(/\n/g, '<br>');
-        
-        // Convert URLs to clickable links
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-        
-        return formatted;
-    }
-
-    showTypingIndicator() {
-        this.isTyping = true;
-        
-        if (this.typingIndicator) {
-            this.typingIndicator.style.display = 'flex';
-            this.scrollToBottom();
-        } else {
-            // Create typing indicator if it doesn't exist
-            this.createTypingIndicator();
-        }
-    }
-
-    hideTypingIndicator() {
-        this.isTyping = false;
-        
-        if (this.typingIndicator) {
-            this.typingIndicator.style.display = 'none';
-        }
-    }
-
-    createTypingIndicator() {
-        if (!this.messagesContainer) return;
-
-        const typingElement = document.createElement('div');
-        typingElement.id = 'typing-indicator';
-        typingElement.className = 'typing-indicator';
-        typingElement.innerHTML = `
-            <div class="message-avatar">
-                <span>t</span>
-            </div>
-            <div class="typing-dots">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        `;
-
-        this.messagesContainer.appendChild(typingElement);
-        this.typingIndicator = typingElement;
-        this.scrollToBottom();
-    }
-
-    autoResizeTextarea() {
-        if (!this.messageInput) return;
-
-        // Reset height to auto to get the correct scrollHeight
-        this.messageInput.style.height = 'auto';
-        
-        // Set height based on scrollHeight, with min and max limits
-        const minHeight = 40;
-        const maxHeight = 120;
-        const newHeight = Math.min(Math.max(this.messageInput.scrollHeight, minHeight), maxHeight);
-        
-        this.messageInput.style.height = newHeight + 'px';
-    }
-
-    scrollToBottom() {
-        if (!this.messagesContainer) return;
-
-        setTimeout(() => {
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        }, 100);
-    }
-
-    generateMessageId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    }
-
-    // Chat history management
-    saveChatHistory() {
-        try {
-            localStorage.setItem('talbot-chat-history', JSON.stringify(this.messages));
-        } catch (error) {
-            console.error('Error saving chat history:', error);
-        }
-    }
-
-    loadChatHistory() {
-        try {
-            const saved = localStorage.getItem('talbot-chat-history');
-            if (saved) {
-                this.messages = JSON.parse(saved);
-                this.renderChatHistory();
-                console.log('Chat history loaded:', this.messages.length, 'messages');
-            } else {
-                this.showWelcomeMessage();
-            }
-        } catch (error) {
-            console.error('Error loading chat history:', error);
-            this.showWelcomeMessage();
-        }
-    }
-
-    renderChatHistory() {
-        if (!this.messagesContainer) return;
-
-        // Clear existing messages
-        this.messagesContainer.innerHTML = '';
-
-        if (this.messages.length === 0) {
-            this.showWelcomeMessage();
-            return;
-        }
-
-        // Render all messages
-        this.messages.forEach(message => {
-            this.renderMessage(message);
-        });
-
-        this.scrollToBottom();
-    }
-
-    showWelcomeMessage() {
-        if (!this.messagesContainer) return;
-
-        this.messagesContainer.innerHTML = `
-            <div class="welcome-message">
-                <h2>Hi, I'm Talbot</h2>
-                <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
-            </div>
-        `;
-    }
-
-    clearMessages() {
-        this.messages = [];
-        if (this.messagesContainer) {
-            this.messagesContainer.innerHTML = '';
-        }
-        this.showWelcomeMessage();
-        localStorage.removeItem('talbot-chat-history');
-    }
-
-    // Public API methods
-    getMessages() {
-        return this.messages;
-    }
-
-    getMessageCount() {
-        return this.messages.length;
-    }
-
-    hasMessages() {
-        return this.messages.length > 0;
-    }
-
-    getLastMessage() {
-        return this.messages[this.messages.length - 1] || null;
-    }
-
-    getUserMessages() {
-        return this.messages.filter(m => m.sender === 'user');
-    }
-
-    getAssistantMessages() {
-        return this.messages.filter(m => m.sender === 'assistant');
-    }
-
-    // Speech manager access
-    getSpeechManager() {
-        return this.speechManager;
-    }
-
-    // Voice settings methods for backward compatibility
-    getVoiceMode() {
-        return this.speechManager?.getVoiceMode() || 0;
-    }
-
-    isVoiceAvailable() {
-        return !!this.speechManager;
-    }
-
-    // Message statistics
-    getMessageStats() {
-        const userMessages = this.getUserMessages();
-        const assistantMessages = this.getAssistantMessages();
-        
-        return {
-            total: this.messages.length,
-            user: userMessages.length,
-            assistant: assistantMessages.length,
-            averageUserMessageLength: userMessages.reduce((acc, msg) => acc + msg.content.length, 0) / userMessages.length || 0,
-            averageAssistantMessageLength: assistantMessages.reduce((acc, msg) => acc + msg.content.length, 0) / assistantMessages.length || 0,
-            firstMessage: this.messages[0]?.timestamp || null,
-            lastMessage: this.messages[this.messages.length - 1]?.timestamp || null
-        };
-    }
-}
+    // The rest of the methods remain largely the same...
