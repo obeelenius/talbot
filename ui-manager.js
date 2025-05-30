@@ -1,31 +1,16 @@
-// UI Manager - Handle Interface Updates and Message Display with Fixed Event Handling
+// UI Manager - Handle Interface Updates and Message Display with Duplicate Prevention
 class UIManager {
     constructor() {
         this.messages = [];
         this.isTyping = false;
         this.speechManager = null;
         
-        // Duplicate prevention flags
-        this.isProcessingSend = false;
-        this.lastSendTime = 0;
-        this.preventDuplicateTimeout = null;
-        
-        // Event handler bindings - store references to avoid duplication
-        this._boundSendClick = null;
-        this._boundKeyDown = null;
-        this._boundInput = null;
-        
         this.initializeElements();
+        this.bindEvents();
         this.loadChatHistory();
         this.initializeSpeechManager();
         
-        // Remove ALL existing event listeners
-        this.removeAllEventListeners();
-        
-        // Bind events AFTER everything else is initialized
-        this.bindEvents();
-        
-        console.log('UIManager initialized with strict send-only processing');
+        console.log('UIManager initialized');
     }
 
     initializeElements() {
@@ -40,196 +25,455 @@ class UIManager {
         try {
             this.speechManager = new SpeechManager();
             
-            // Set up speech manager callbacks - USING EXPLICIT FUNCTION REFERENCE
-            this.speechManager.setOnSpeechResult(this.handleVoiceInputStrict.bind(this));
+            // Set up speech manager callbacks
+            this.speechManager.setOnSpeechResult((text) => {
+                this.handleVoiceInput(text);
+            });
             
-            console.log('SpeechManager initialized in UIManager with strict callbacks');
+            console.log('SpeechManager initialized in UIManager');
         } catch (error) {
             console.warn('SpeechManager not available:', error);
         }
     }
 
-    // Radical approach: remove ALL event listeners from elements
-    removeAllEventListeners() {
-        console.log('🧨 Removing ALL event listeners from UI elements');
-        
-        // Replace the send button completely to remove all listeners
-        if (this.sendButton && this.sendButton.parentNode) {
-            const newButton = this.sendButton.cloneNode(true);
-            this.sendButton.parentNode.replaceChild(newButton, this.sendButton);
-            this.sendButton = newButton;
-        }
-        
-        // For the input field, we need to be more careful to preserve content
-        if (this.messageInput) {
-            // Save current value and focus state
-            const currentValue = this.messageInput.value;
-            const wasFocused = document.activeElement === this.messageInput;
-            
-            // Create a new input with the same properties
-            const newInput = document.createElement('textarea');
-            
-            // Copy all attributes
-            Array.from(this.messageInput.attributes).forEach(attr => {
-                newInput.setAttribute(attr.name, attr.value);
-            });
-            
-            // Set the same value
-            newInput.value = currentValue;
-            
-            // Replace the old input
-            if (this.messageInput.parentNode) {
-                this.messageInput.parentNode.replaceChild(newInput, this.messageInput);
-                this.messageInput = newInput;
-                
-                // Restore focus if it was focused
-                if (wasFocused) {
-                    this.messageInput.focus();
-                }
-            }
-        }
-        
-        console.log('🧹 All UI elements replaced to remove event listeners');
-    }
-
+    // FIXED: Event binding with comprehensive duplicate prevention
     bindEvents() {
-        console.log('📝 Binding STRICT UI events...');
+        // Duplicate prevention tracking
+        let isProcessingSend = false;
+        let lastSendTime = 0;
         
-        // Send button - EXPLICITLY FOR SEND ONLY
+        // Safe send function with comprehensive duplicate prevention
+        const safeSendMessage = (source) => {
+            const now = Date.now();
+            
+            // Prevent rapid-fire sends (within 300ms)
+            if (now - lastSendTime < 300) {
+                console.log(`🛑 RAPID FIRE PREVENTED from ${source}`);
+                return;
+            }
+            
+            // Prevent concurrent sends
+            if (isProcessingSend) {
+                console.log(`🛑 CONCURRENT SEND PREVENTED from ${source}`);
+                return;
+            }
+            
+            console.log(`📤 Processing send from ${source}`);
+            
+            isProcessingSend = true;
+            lastSendTime = now;
+            
+            try {
+                this.handleSendMessage();
+            } catch (error) {
+                console.error('Error in handleSendMessage:', error);
+            } finally {
+                // Reset the processing flag after a short delay
+                setTimeout(() => {
+                    isProcessingSend = false;
+                }, 200);
+            }
+        };
+
+        // Send button - with duplicate prevention
         if (this.sendButton) {
-            this._boundSendClick = this.handleSendButtonStrict.bind(this);
-            this.sendButton.addEventListener('click', this._boundSendClick);
-            console.log('🔒 Send button click listener bound - STRICT MODE');
+            this.sendButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                safeSendMessage('click');
+            }, { passive: false });
         }
 
-        // Enter key to send - EXPLICITLY FOR SEND ONLY
+        // Enter key to send - with duplicate prevention  
         if (this.messageInput) {
-            this._boundKeyDown = this.handleKeyDownStrict.bind(this);
-            this.messageInput.addEventListener('keydown', this._boundKeyDown);
-            console.log('🔒 Message input keydown listener bound - STRICT MODE');
-            
-            // Input event only for auto-resize and notifying speech manager
-            this._boundInput = this.handleInputChangeStrict.bind(this);
-            this.messageInput.addEventListener('input', this._boundInput);
-            console.log('📏 Message input resize listener bound');
+            this.messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    safeSendMessage('keydown');
+                }
+            }, { passive: false });
+
+            // Auto-resize textarea AND notify speech manager
+            this.messageInput.addEventListener('input', () => {
+                this.autoResizeTextarea();
+                
+                // Notify speech manager that user is typing (stop speech if needed)
+                if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
+                    this.speechManager.handleUserTyping();
+                }
+            }, { passive: true });
         }
         
-        console.log('✅ UI events bound with strict send-only processing');
+        console.log('✅ UI Manager events bound with duplicate prevention');
     }
-    
-    // STRICT EVENT HANDLERS - ensuring they ONLY process sends
-    
-    handleSendButtonStrict(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation(); // Prevent any other handlers
-        
-        console.log('👆 Send button clicked - STRICT HANDLER');
-        this.processSendMessageStrict('button_click');
-    }
-    
-    handleKeyDownStrict(e) {
-        // ONLY process Enter key (without shift)
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation(); // Prevent any other handlers
-            
-            console.log('⌨️ Enter key pressed - STRICT HANDLER');
-            this.processSendMessageStrict('enter_key');
+
+    handleSendMessage() {
+        const message = this.messageInput?.value?.trim();
+        if (!message) {
+            console.log('🛑 No message to send (empty input)');
+            return;
         }
-        // Ignore all other key events
-    }
-    
-    handleInputChangeStrict() {
-        // ONLY handle UI updates, never process messages
-        this.autoResizeTextarea();
-        
-        // Notify speech manager about typing (if speaking)
-        if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
-            this.speechManager.handleUserTyping();
+
+        console.log('📤 handleSendMessage processing:', message.substring(0, 50) + '...');
+
+        // Clear input FIRST to prevent re-submission
+        const originalMessage = message;
+        if (this.messageInput) {
+            this.messageInput.value = '';
+            this.autoResizeTextarea();
         }
+
+        // Add user message to UI
+        this.addMessage(originalMessage, 'user');
+        
+        // Trigger AI response
+        this.getAIResponse(originalMessage);
     }
-    
-    handleVoiceInputStrict(text) {
+
+    handleVoiceInput(text) {
+        // Handle voice input from speech manager
         if (!text) return;
         
-        console.log('🎤 Voice input received - STRICT HANDLER');
-        this.processSendMessageStrict('voice_input', text);
+        console.log('🎤 Voice input received:', text);
+        
+        // Add user message to UI
+        this.addMessage(text, 'user');
+        
+        // Trigger AI response
+        this.getAIResponse(text);
     }
 
-    // Strict send processing that ignores typing and only processes explicit sends
-    processSendMessageStrict(source, voiceText = null) {
-        const now = Date.now();
-        
-        // Explicit debug statement for send attempt
-        console.log(`🔐 STRICT SEND from source: ${source}, processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms`);
-        
-        // Prevent duplicate sends
-        if (this.isProcessingSend) {
-            console.log(`🛑 BLOCKED: Already processing a send operation (${source})`);
-            return;
-        }
-        
-        if (now - this.lastSendTime < 800) {
-            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source})`);
-            return;
-        }
-        
-        // Get message content - either from voice or input field
-        const message = voiceText || (this.messageInput?.value?.trim() || '');
-        if (!message) {
-            console.log('⚠️ No message to send (empty input)');
-            return;
-        }
-        
-        // Set flags immediately to prevent race conditions
-        this.isProcessingSend = true;
-        this.lastSendTime = now;
-        
-        // Clear any existing timeout
-        if (this.preventDuplicateTimeout) {
-            clearTimeout(this.preventDuplicateTimeout);
-        }
-        
-        // Execute the send operation
-        this.executeStrictSend(message, source);
-        
-        // Set a timeout to release the lock (failsafe)
-        this.preventDuplicateTimeout = setTimeout(() => {
-            if (this.isProcessingSend) {
-                console.log('🔓 Releasing processing lock (timeout)');
-                this.isProcessingSend = false;
-            }
-        }, 3000); // 3 seconds max lock
-    }
-    
-    executeStrictSend(message, source) {
-        console.log(`📤 STRICT SEND processing: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}" from ${source}`);
-        
+    async getAIResponse(message) {
         try {
-            // Only clear input if it's from the input field (not voice)
-            if (source !== 'voice_input' && this.messageInput) {
-                this.messageInput.value = '';
-                this.autoResizeTextarea();
-                this.messageInput.focus();
+            // Show typing indicator
+            this.showTypingIndicator();
+            
+            // Get AI response
+            if (window.aiResponseManager) {
+                const response = await window.aiResponseManager.getAIResponse(message);
+                
+                // Hide typing indicator
+                this.hideTypingIndicator();
+                
+                // Add AI response to UI
+                this.addMessage(response, 'assistant');
+                
+                // Speak the response if voice is enabled
+                if (this.speechManager) {
+                    await this.speechManager.speakMessage(response);
+                }
+            } else {
+                console.error('AI Response Manager not available');
+                this.hideTypingIndicator();
+                this.addMessage("I'm having trouble connecting right now. Please try again.", 'assistant');
             }
-            
-            // Add user message to UI
-            this.addMessage(message, 'user');
-            
-            // Trigger AI response
-            this.getAIResponse(message);
-            
         } catch (error) {
-            console.error('Error sending message:', error);
-        } finally {
-            // Always release the processing lock after a short delay
-            setTimeout(() => {
-                console.log('🔓 Releasing processing lock (completed)');
-                this.isProcessingSend = false;
-            }, 500); // Short delay to prevent immediate re-sends
+            console.error('Error getting AI response:', error);
+            this.hideTypingIndicator();
+            this.addMessage("I'm having trouble responding right now. Please try again.", 'assistant');
         }
     }
 
-    // The rest of the methods remain largely the same...
+    addMessage(content, sender, timestamp = null) {
+        const messageObj = {
+            content: content,
+            sender: sender, // 'user' or 'assistant'
+            timestamp: timestamp || new Date().toISOString(),
+            id: this.generateMessageId()
+        };
+
+        this.messages.push(messageObj);
+        this.renderMessage(messageObj);
+        this.scrollToBottom();
+        this.saveChatHistory();
+
+        return messageObj;
+    }
+
+    renderMessage(messageObj) {
+        if (!this.messagesContainer) return;
+
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${messageObj.sender}`;
+        messageElement.id = `message-${messageObj.id}`;
+
+        const timeString = new Date(messageObj.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Create avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        if (messageObj.sender === 'user') {
+            avatar.innerHTML = 'U';
+        } else {
+            avatar.innerHTML = 't';
+        }
+
+        // Create content
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.innerHTML = `
+            <div class="message-text">${this.formatMessageContent(messageObj.content)}</div>
+            <div class="message-time">${timeString}</div>
+        `;
+
+        messageElement.appendChild(avatar);
+        messageElement.appendChild(content);
+
+        // Remove welcome message if it exists
+        const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
+        if (welcomeMessage && this.messages.length === 1) {
+            welcomeMessage.remove();
+        }
+
+        this.messagesContainer.appendChild(messageElement);
+    }
+
+    formatMessageContent(content) {
+        // Convert line breaks to <br> tags
+        let formatted = content.replace(/\n/g, '<br>');
+        
+        // Convert URLs to clickable links
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+        
+        return formatted;
+    }
+
+    showTypingIndicator() {
+        this.isTyping = true;
+        
+        if (this.typingIndicator) {
+            this.typingIndicator.style.display = 'flex';
+            this.scrollToBottom();
+        } else {
+            // Create typing indicator if it doesn't exist
+            this.createTypingIndicator();
+        }
+    }
+
+    hideTypingIndicator() {
+        this.isTyping = false;
+        
+        if (this.typingIndicator) {
+            this.typingIndicator.style.display = 'none';
+        }
+    }
+
+    createTypingIndicator() {
+        if (!this.messagesContainer) return;
+
+        const typingElement = document.createElement('div');
+        typingElement.id = 'typing-indicator';
+        typingElement.className = 'typing-indicator';
+        typingElement.innerHTML = `
+            <div class="message-avatar">
+                <span>t</span>
+            </div>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        `;
+
+        this.messagesContainer.appendChild(typingElement);
+        this.typingIndicator = typingElement;
+        this.scrollToBottom();
+    }
+
+    autoResizeTextarea() {
+        if (!this.messageInput) return;
+
+        // Reset height to auto to get the correct scrollHeight
+        this.messageInput.style.height = 'auto';
+        
+        // Set height based on scrollHeight, with min and max limits
+        const minHeight = 40;
+        const maxHeight = 120;
+        const newHeight = Math.min(Math.max(this.messageInput.scrollHeight, minHeight), maxHeight);
+        
+        this.messageInput.style.height = newHeight + 'px';
+    }
+
+    scrollToBottom() {
+        if (!this.messagesContainer) return;
+
+        setTimeout(() => {
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }, 100);
+    }
+
+    generateMessageId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Chat history management
+    saveChatHistory() {
+        try {
+            localStorage.setItem('talbot-chat-history', JSON.stringify(this.messages));
+        } catch (error) {
+            console.error('Error saving chat history:', error);
+        }
+    }
+
+    loadChatHistory() {
+        try {
+            const saved = localStorage.getItem('talbot-chat-history');
+            if (saved) {
+                this.messages = JSON.parse(saved);
+                this.renderChatHistory();
+                console.log('Chat history loaded:', this.messages.length, 'messages');
+            } else {
+                this.showWelcomeMessage();
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+            this.showWelcomeMessage();
+        }
+    }
+
+    renderChatHistory() {
+        if (!this.messagesContainer) return;
+
+        // Clear existing messages
+        this.messagesContainer.innerHTML = '';
+
+        if (this.messages.length === 0) {
+            this.showWelcomeMessage();
+            return;
+        }
+
+        // Render all messages
+        this.messages.forEach(message => {
+            this.renderMessage(message);
+        });
+
+        this.scrollToBottom();
+    }
+
+    showWelcomeMessage() {
+        if (!this.messagesContainer) return;
+
+        this.messagesContainer.innerHTML = `
+            <div class="welcome-message">
+                <h2>Hi, I'm Talbot</h2>
+                <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
+            </div>
+        `;
+    }
+
+    clearMessages() {
+        this.messages = [];
+        if (this.messagesContainer) {
+            this.messagesContainer.innerHTML = '';
+        }
+        this.showWelcomeMessage();
+        localStorage.removeItem('talbot-chat-history');
+    }
+
+    // Public API methods
+    getMessages() {
+        return this.messages;
+    }
+
+    getMessageCount() {
+        return this.messages.length;
+    }
+
+    hasMessages() {
+        return this.messages.length > 0;
+    }
+
+    getLastMessage() {
+        return this.messages[this.messages.length - 1] || null;
+    }
+
+    getUserMessages() {
+        return this.messages.filter(m => m.sender === 'user');
+    }
+
+    getAssistantMessages() {
+        return this.messages.filter(m => m.sender === 'assistant');
+    }
+
+    // Message editing/deletion (for future features)
+    editMessage(messageId, newContent) {
+        const messageIndex = this.messages.findIndex(m => m.id === messageId);
+        if (messageIndex !== -1) {
+            this.messages[messageIndex].content = newContent;
+            this.messages[messageIndex].edited = true;
+            this.messages[messageIndex].editedAt = new Date().toISOString();
+            this.saveChatHistory();
+            this.renderChatHistory();
+        }
+    }
+
+    deleteMessage(messageId) {
+        this.messages = this.messages.filter(m => m.id !== messageId);
+        this.saveChatHistory();
+        this.renderChatHistory();
+    }
+
+    // Export chat functionality
+    exportChat() {
+        const chatData = {
+            exportDate: new Date().toISOString(),
+            messageCount: this.messages.length,
+            messages: this.messages
+        };
+
+        const dataStr = JSON.stringify(chatData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `talbot-chat-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Search functionality
+    searchMessages(query) {
+        if (!query) return [];
+
+        const lowercaseQuery = query.toLowerCase();
+        return this.messages.filter(message =>
+            message.content.toLowerCase().includes(lowercaseQuery)
+        );
+    }
+
+    // Message statistics
+    getMessageStats() {
+        const userMessages = this.getUserMessages();
+        const assistantMessages = this.getAssistantMessages();
+        
+        return {
+            total: this.messages.length,
+            user: userMessages.length,
+            assistant: assistantMessages.length,
+            averageUserMessageLength: userMessages.reduce((acc, msg) => acc + msg.content.length, 0) / userMessages.length || 0,
+            averageAssistantMessageLength: assistantMessages.reduce((acc, msg) => acc + msg.content.length, 0) / assistantMessages.length || 0,
+            firstMessage: this.messages[0]?.timestamp || null,
+            lastMessage: this.messages[this.messages.length - 1]?.timestamp || null
+        };
+    }
+
+    // Speech manager access
+    getSpeechManager() {
+        return this.speechManager;
+    }
+
+    // Voice settings methods for backward compatibility
+    getVoiceMode() {
+        return this.speechManager?.getVoiceMode() || 0;
+    }
+
+    isVoiceAvailable() {
+        return !!this.speechManager;
+    }
+}
