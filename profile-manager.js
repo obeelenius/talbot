@@ -277,7 +277,7 @@ class ProfileManager {
         const significantPeople = this.getSignificantPeople();
         if (!significantPeople) return [];
 
-        // Parse format like "Marian - mother, Peter - boyfriend, Zea - sister"
+        // Parse format like "Marian - mother, Peter - partner, Zea - sister"
         const people = [];
         const entries = significantPeople.split(',');
         
