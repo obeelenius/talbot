@@ -1,4 +1,4 @@
-// Main Talbot Application with Conversation Memory - Fixed Duplication
+// Main Talbot Application with Conversation Management
 class TalbotApp {
     constructor() {
         this.isProcessingMessage = false; // Prevent duplicate message processing
@@ -9,7 +9,7 @@ class TalbotApp {
         // Load any saved data
         this.uiManager.loadChatHistory();
         
-        console.log('Talbot initialized successfully with conversation memory and duplication fixes');
+        console.log('Talbot initialized successfully with conversation management');
     }
 
     initializeComponents() {
@@ -20,20 +20,23 @@ class TalbotApp {
         
         // Pass uiManager to aiResponseManager so it can access conversation history
         this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
+        
+        // Initialize conversation manager after other components
+        this.conversationManager = new ConversationManager(this.uiManager, this.profileManager);
     }
 
     setupEventHandlers() {
         // Connect UI events to app logic with duplication prevention
-        this.uiManager.setOnSendMessage(() => {
+        this.uiManager.setOnSendMessage((message) => {
             if (!this.isProcessingMessage) {
-                this.handleSendMessage();
+                this.handleSendMessage(message);
             }
         });
         
-        // Connect speech events
+        // Connect speech events - for auto-send voice messages
         this.speechManager.setOnSpeechResult((transcript) => {
             if (!this.isProcessingMessage) {
-                this.handleSendMessage(); // Auto-send when speech is recognized
+                this.handleSendMessage(transcript);
             }
         });
         
@@ -50,15 +53,16 @@ class TalbotApp {
         });
     }
 
-    async handleSendMessage() {
+    async handleSendMessage(message = null) {
         // Prevent duplicate processing
         if (this.isProcessingMessage) {
             console.log('Message already being processed, skipping duplicate');
             return;
         }
 
-        const message = this.uiManager.getMessageInput();
-        if (!message || !message.trim()) {
+        // Get message from parameter or UI input
+        const messageText = message || this.uiManager.getMessageInput();
+        if (!messageText || !messageText.trim()) {
             console.log('Empty message, not sending');
             return;
         }
@@ -68,18 +72,18 @@ class TalbotApp {
             this.isProcessingMessage = true;
             this.uiManager.setProcessingState(true);
 
-            console.log('Processing message:', message);
+            console.log('Processing message:', messageText);
 
             // Add user message immediately
-            this.uiManager.addMessage('user', message);
+            this.uiManager.addMessage('user', messageText);
             this.uiManager.clearMessageInput();
 
             // Show typing indicator
             this.uiManager.showTyping();
             this.speechManager.updateStatus('Talbot is thinking...', '🤔');
 
-            // Get AI response (now includes conversation history)
-            const response = await this.aiResponseManager.getAIResponse(message);
+            // Get enhanced AI response with conversation context
+            const response = await this.getEnhancedAIResponse(messageText);
 
             // Hide typing and show response
             this.uiManager.hideTyping();
@@ -104,12 +108,38 @@ class TalbotApp {
         }
     }
 
+    // Enhanced AI response that includes conversation context
+    async getEnhancedAIResponse(message) {
+        try {
+            // Get conversation context if available
+            const conversationContext = this.conversationManager.getConversationContext();
+            
+            // Build enhanced contextual message
+            let enhancedMessage = message;
+            
+            if (conversationContext) {
+                enhancedMessage = `${conversationContext}\n\nCurrent message: ${message}`;
+                console.log('Adding conversation context to message');
+            }
+            
+            // Get the AI response with full context
+            const response = await this.aiResponseManager.getAIResponse(enhancedMessage);
+            
+            return response;
+            
+        } catch (error) {
+            console.error('Enhanced AI response failed:', error);
+            // Fallback to regular response without context
+            return await this.aiResponseManager.getAIResponse(message);
+        }
+    }
+
     // Service Worker Registration for PWA
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
                 const swCode = `
-                    const CACHE_NAME = 'talbot-v2';
+                    const CACHE_NAME = 'talbot-v3';
                     const urlsToCache = [
                         '/',
                         '/index.html',
@@ -119,6 +149,7 @@ class TalbotApp {
                         '/speech-manager.js',
                         '/ai-response-manager.js',
                         '/ui-manager.js',
+                        '/conversation-manager.js',
                         '/app.js'
                     ];
                     
@@ -190,11 +221,14 @@ class TalbotApp {
         return this.uiManager.getMessages();
     }
 
+    getConversationMemory() {
+        return this.conversationManager.getConversationMemory();
+    }
+
     // Development/debugging helpers
     simulateMessage(message) {
         if (!this.isProcessingMessage) {
-            this.uiManager.messageInput.value = message;
-            this.handleSendMessage();
+            this.handleSendMessage(message);
         }
     }
 
@@ -206,8 +240,19 @@ class TalbotApp {
             isListening: this.speechManager.getIsListening(),
             isSpeaking: this.speechManager.getIsSpeaking(),
             conversationLength: this.uiManager.getMessages().length,
+            conversationMemory: this.conversationManager.getConversationMemory(),
+            hasConversationMemory: this.conversationManager.hasConversationMemory(),
             isProcessingMessage: this.isProcessingMessage
         };
+    }
+
+    // Conversation management helpers
+    startNewConversation(keepContext = true) {
+        if (keepContext) {
+            this.conversationManager.handleKeepContext();
+        } else {
+            this.conversationManager.handleCompleteReset();
+        }
     }
 
     // Error recovery
@@ -265,13 +310,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 getState: () => window.talbotApp.getAppState(),
                 simulate: (msg) => window.talbotApp.simulateMessage(msg),
                 getHistory: () => window.talbotApp.getChatMessages(),
-                version: '2.0.1-fixed-duplication'
+                getMemory: () => window.talbotApp.getConversationMemory(),
+                startFresh: (keepContext = true) => window.talbotApp.startNewConversation(keepContext),
+                version: '3.0.0-conversation-management'
             };
             
-            console.log('🤖 Talbot v2.0.1 with Fixed Duplication is ready! Try these console commands:');
+            console.log('🤖 Talbot v3.0.0 with Conversation Management is ready! Try these console commands:');
             console.log('  talbot.getState() - Get app state');
             console.log('  talbot.getHistory() - See conversation history');
+            console.log('  talbot.getMemory() - See conversation memory');
             console.log('  talbot.simulate("test message") - Send a test message');
+            console.log('  talbot.startFresh(true) - Start new conversation keeping context');
+            console.log('  talbot.startFresh(false) - Complete reset');
             console.log('  talbot.exportChat() - Export chat history');
             console.log('  talbot.clearChat() - Clear chat history');
         }
