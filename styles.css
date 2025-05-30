@@ -565,7 +565,7 @@ body {
     color: var(--text-secondary);
 }
 
-/* Profile Modal - Updated with Sticky Buttons */
+/* Profile Modal - Modern Design */
 .profile-modal {
     display: none;
     position: fixed;
@@ -593,10 +593,6 @@ body {
     box-shadow: var(--shadow-xl);
     animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    position: relative;
-    max-height: calc(100vh - 4rem); /* Ensure modal doesn't exceed viewport */
-    display: flex;
-    flex-direction: column;
 }
 
 .profile-header {
@@ -606,9 +602,6 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
 .profile-header h2 {
@@ -637,7 +630,7 @@ body {
     transform: scale(1.05);
 }
 
-/* New Conversation Modal - Updated with Sticky Buttons */
+/* New Conversation Modal */
 .conversation-modal {
     display: none;
     position: fixed;
@@ -665,10 +658,6 @@ body {
     box-shadow: var(--shadow-xl);
     animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    position: relative;
-    max-height: calc(100vh - 4rem); /* Ensure modal doesn't exceed viewport */
-    display: flex;
-    flex-direction: column;
 }
 
 .conversation-header {
@@ -678,9 +667,6 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
 .conversation-header h2 {
@@ -691,9 +677,6 @@ body {
 
 .conversation-body {
     padding: var(--spacing-2xl);
-    overflow-y: auto;
-    flex: 1;
-    padding-bottom: 120px; /* Make room for sticky buttons */
 }
 
 .conversation-info {
@@ -829,24 +812,15 @@ body {
     transform: none;
 }
 
-/* Sticky Conversation Actions */
 .conversation-actions {
-    position: sticky;
-    bottom: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border-light);
     padding: var(--spacing-xl) var(--spacing-2xl);
+    border-top: 1px solid var(--border-light);
     text-align: center;
-    z-index: 10;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Form Styles - Updated for scrollable content */
+/* Form Styles */
 .profile-form {
     padding: var(--spacing-2xl);
-    overflow-y: auto;
-    flex: 1;
-    padding-bottom: 120px; /* Make room for sticky buttons */
 }
 
 .form-section {
@@ -1014,40 +988,13 @@ body {
     background: var(--burgundy-600);
 }
 
-/* Profile Actions - Fixed container to stretch full width */
 .profile-actions {
-    position: sticky;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    background: var(--surface);
-    border-top: 1px solid var(--border-light);
-    padding: var(--spacing-xl) var(--spacing-2xl);
     display: flex;
     gap: var(--spacing-md);
-    justify-content: center;
-    align-items: center;
-    z-index: 10;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
-    margin: 0; /* Remove any potential margins */
-    border-radius: 0; /* Ensure no border radius interferes */
-}
-
-/* Ensure the profile content doesn't have conflicting styles */
-.profile-content {
-    background: var(--surface);
-    margin: var(--spacing-xl);
-    border-radius: var(--radius-xl);
-    max-width: 42rem;
-    margin: var(--spacing-xl) auto;
-    box-shadow: var(--shadow-xl);
-    animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-    position: relative;
-    max-height: calc(100vh - 4rem);
-    display: flex;
-    flex-direction: column;
+    justify-content: flex-end;
+    padding-top: var(--spacing-xl);
+    border-top: 1px solid var(--border-light);
+    margin-top: var(--spacing-xl);
 }
 
 /* Checkbox Styles */
@@ -1133,13 +1080,11 @@ body {
     .conversation-content {
         margin: var(--spacing-md);
         border-radius: var(--radius-lg);
-        max-height: calc(100vh - 2rem);
     }
     
     .profile-form,
     .conversation-body {
         padding: var(--spacing-xl);
-        padding-bottom: 100px; /* Adjust for mobile */
     }
     
     .form-row {
@@ -1149,17 +1094,6 @@ body {
     
     .profile-actions {
         flex-direction: column;
-        padding: var(--spacing-lg) var(--spacing-xl);
-        gap: var(--spacing-sm);
-    }
-    
-    .profile-actions .btn {
-        width: 100%; /* Make buttons full width on mobile */
-        text-align: center;
-    }
-    
-    .conversation-actions {
-        padding: var(--spacing-lg) var(--spacing-xl);
     }
     
     .welcome-message {
@@ -1237,26 +1171,6 @@ body {
         padding: var(--spacing-md);
         font-size: 0.75rem;
     }
-    
-    .profile-content,
-    .conversation-content {
-        margin: var(--spacing-sm);
-        max-height: calc(100vh - 1rem);
-    }
-    
-    .profile-form,
-    .conversation-body {
-        padding: var(--spacing-md);
-        padding-bottom: 90px; /* Adjust for very small screens */
-    }
-    
-    .profile-actions {
-        padding: var(--spacing-md) var(--spacing-xl);
-    }
-    
-    .conversation-actions {
-        padding: var(--spacing-md) var(--spacing-xl);
-    }
 }
 
 /* Extra narrow screens */
@@ -1307,14 +1221,6 @@ body {
         min-width: 120px;
         padding: var(--spacing-sm);
         font-size: 0.7rem;
-    }
-    
-    .profile-actions {
-        padding: var(--spacing-sm) var(--spacing-md);
-    }
-    
-    .conversation-actions {
-        padding: var(--spacing-sm) var(--spacing-md);
     }
 }
 
