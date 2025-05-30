@@ -15,19 +15,26 @@ class ProfileManager {
     initializeElements() {
         this.profileButton = document.getElementById('profile-button');
         this.profileModal = document.getElementById('profile-modal');
-        this.closeProfileModal = document.getElementById('close-profile-modal');
+        this.closeProfileButton = document.getElementById('close-profile'); // Fixed ID
         this.profileForm = document.getElementById('profile-form');
-        this.nameInput = document.getElementById('profile-name');
-        this.ageInput = document.getElementById('profile-age');
-        this.pronounsSelect = document.getElementById('profile-pronouns');
-        this.locationInput = document.getElementById('profile-location');
-        this.therapistInput = document.getElementById('profile-therapist');
-        this.sessionFrequencySelect = document.getElementById('profile-session-frequency');
-        this.mainConcernsTextarea = document.getElementById('profile-main-concerns');
-        this.goalsTextarea = document.getElementById('profile-goals');
+        
+        // Profile form fields - using your actual HTML IDs
+        this.preferredNameInput = document.getElementById('preferred-name');
+        this.ageRangeSelect = document.getElementById('age-range');
+        this.pronounsInput = document.getElementById('pronouns');
+        this.diagnosesTextarea = document.getElementById('diagnoses');
+        this.medicationsTextarea = document.getElementById('medications');
+        this.treatmentHistoryTextarea = document.getElementById('treatment-history');
+        this.therapyGoalsTextarea = document.getElementById('therapy-goals');
+        this.copingStrategiesTextarea = document.getElementById('coping-strategies');
+        this.currentStressorsTextarea = document.getElementById('current-stressors');
+        this.therapistInfoTextarea = document.getElementById('therapist-info');
         this.significantPeopleTextarea = document.getElementById('profile-significant-people');
-        this.saveProfileButton = document.getElementById('save-profile-button');
-        this.cancelProfileButton = document.getElementById('cancel-profile-button');
+        
+        // Form buttons
+        this.clearProfileButton = document.getElementById('clear-profile');
+        this.cancelProfileButton = document.getElementById('cancel-profile');
+        this.saveProfileButton = this.profileForm?.querySelector('button[type="submit"]');
     }
 
     bindEvents() {
@@ -37,12 +44,17 @@ class ProfileManager {
         }
 
         // Modal close events
-        if (this.closeProfileModal) {
-            this.closeProfileModal.addEventListener('click', () => this.closeProfileModal());
+        if (this.closeProfileButton) {
+            this.closeProfileButton.addEventListener('click', () => this.closeProfileModal());
         }
 
         if (this.cancelProfileButton) {
             this.cancelProfileButton.addEventListener('click', () => this.closeProfileModal());
+        }
+
+        // Clear profile button
+        if (this.clearProfileButton) {
+            this.clearProfileButton.addEventListener('click', () => this.handleClearProfile());
         }
 
         // Modal background click to close
@@ -57,10 +69,6 @@ class ProfileManager {
         // Form submission
         if (this.profileForm) {
             this.profileForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
-        }
-
-        if (this.saveProfileButton) {
-            this.saveProfileButton.addEventListener('click', (e) => this.handleFormSubmit(e));
         }
     }
 
@@ -89,14 +97,16 @@ class ProfileManager {
     populateForm() {
         if (!this.profile) return;
 
-        if (this.nameInput) this.nameInput.value = this.profile.name || '';
-        if (this.ageInput) this.ageInput.value = this.profile.age || '';
-        if (this.pronounsSelect) this.pronounsSelect.value = this.profile.pronouns || '';
-        if (this.locationInput) this.locationInput.value = this.profile.location || '';
-        if (this.therapistInput) this.therapistInput.value = this.profile.therapist || '';
-        if (this.sessionFrequencySelect) this.sessionFrequencySelect.value = this.profile.sessionFrequency || '';
-        if (this.mainConcernsTextarea) this.mainConcernsTextarea.value = this.profile.mainConcerns || '';
-        if (this.goalsTextarea) this.goalsTextarea.value = this.profile.goals || '';
+        if (this.preferredNameInput) this.preferredNameInput.value = this.profile.preferredName || '';
+        if (this.ageRangeSelect) this.ageRangeSelect.value = this.profile.ageRange || '';
+        if (this.pronounsInput) this.pronounsInput.value = this.profile.pronouns || '';
+        if (this.diagnosesTextarea) this.diagnosesTextarea.value = this.profile.diagnoses || '';
+        if (this.medicationsTextarea) this.medicationsTextarea.value = this.profile.medications || '';
+        if (this.treatmentHistoryTextarea) this.treatmentHistoryTextarea.value = this.profile.treatmentHistory || '';
+        if (this.therapyGoalsTextarea) this.therapyGoalsTextarea.value = this.profile.therapyGoals || '';
+        if (this.copingStrategiesTextarea) this.copingStrategiesTextarea.value = this.profile.copingStrategies || '';
+        if (this.currentStressorsTextarea) this.currentStressorsTextarea.value = this.profile.currentStressors || '';
+        if (this.therapistInfoTextarea) this.therapistInfoTextarea.value = this.profile.therapistInfo || '';
         if (this.significantPeopleTextarea) this.significantPeopleTextarea.value = this.profile.significantPeople || '';
     }
 
@@ -104,23 +114,25 @@ class ProfileManager {
         e.preventDefault();
         
         try {
-            // Collect form data
+            // Collect form data using your actual form field IDs
             const profileData = {
-                name: this.nameInput?.value?.trim() || '',
-                age: this.ageInput?.value?.trim() || '',
-                pronouns: this.pronounsSelect?.value || '',
-                location: this.locationInput?.value?.trim() || '',
-                therapist: this.therapistInput?.value?.trim() || '',
-                sessionFrequency: this.sessionFrequencySelect?.value || '',
-                mainConcerns: this.mainConcernsTextarea?.value?.trim() || '',
-                goals: this.goalsTextarea?.value?.trim() || '',
+                preferredName: this.preferredNameInput?.value?.trim() || '',
+                ageRange: this.ageRangeSelect?.value || '',
+                pronouns: this.pronounsInput?.value?.trim() || '',
+                diagnoses: this.diagnosesTextarea?.value?.trim() || '',
+                medications: this.medicationsTextarea?.value?.trim() || '',
+                treatmentHistory: this.treatmentHistoryTextarea?.value?.trim() || '',
+                therapyGoals: this.therapyGoalsTextarea?.value?.trim() || '',
+                copingStrategies: this.copingStrategiesTextarea?.value?.trim() || '',
+                currentStressors: this.currentStressorsTextarea?.value?.trim() || '',
+                therapistInfo: this.therapistInfoTextarea?.value?.trim() || '',
                 significantPeople: this.significantPeopleTextarea?.value?.trim() || '',
                 lastUpdated: new Date().toISOString()
             };
 
             // Validate required fields
-            if (!profileData.name) {
-                this.showErrorMessage('Please enter your name.');
+            if (!profileData.preferredName) {
+                this.showErrorMessage('Please enter your preferred name.');
                 return;
             }
 
@@ -138,6 +150,22 @@ class ProfileManager {
         } catch (error) {
             console.error('Error saving profile:', error);
             this.showErrorMessage('Sorry, there was an issue saving your profile. Please try again.');
+        }
+    }
+
+    handleClearProfile() {
+        const confirmed = confirm(
+            'Are you sure you want to clear all profile data?\n\n' +
+            'This action cannot be undone.'
+        );
+        
+        if (confirmed) {
+            this.profile = null;
+            localStorage.removeItem('talbot-user-profile');
+            this.resetNameUsageTracking();
+            this.populateForm(); // This will clear the form since profile is null
+            this.showSuccessMessage('Profile data cleared.');
+            console.log('Profile data cleared');
         }
     }
 
@@ -159,6 +187,17 @@ class ProfileManager {
         } catch (error) {
             console.error('Error loading profile:', error);
         }
+    }
+
+    // Legacy method for backward compatibility
+    buildContextualMessage(message) {
+        // Simple implementation for backward compatibility
+        return message;
+    }
+
+    // Legacy method for backward compatibility  
+    getProfile() {
+        return this.profile;
     }
 
     // Name usage tracking methods
@@ -190,35 +229,43 @@ class ProfileManager {
 
     // Profile data getters
     getName() {
-        return this.profile?.name || '';
+        return this.profile?.preferredName || '';
     }
 
     getAge() {
-        return this.profile?.age || '';
+        return this.profile?.ageRange || '';
     }
 
     getPronouns() {
         return this.profile?.pronouns || '';
     }
 
-    getLocation() {
-        return this.profile?.location || '';
+    getDiagnoses() {
+        return this.profile?.diagnoses || '';
     }
 
-    getTherapist() {
-        return this.profile?.therapist || '';
+    getMedications() {
+        return this.profile?.medications || '';
     }
 
-    getSessionFrequency() {
-        return this.profile?.sessionFrequency || '';
+    getTreatmentHistory() {
+        return this.profile?.treatmentHistory || '';
     }
 
-    getMainConcerns() {
-        return this.profile?.mainConcerns || '';
+    getTherapyGoals() {
+        return this.profile?.therapyGoals || '';
     }
 
-    getGoals() {
-        return this.profile?.goals || '';
+    getCopingStrategies() {
+        return this.profile?.copingStrategies || '';
+    }
+
+    getCurrentStressors() {
+        return this.profile?.currentStressors || '';
+    }
+
+    getTherapistInfo() {
+        return this.profile?.therapistInfo || '';
     }
 
     getSignificantPeople() {
@@ -261,7 +308,7 @@ class ProfileManager {
     }
 
     hasName() {
-        return this.profile?.name && this.profile.name.trim().length > 0;
+        return this.profile?.preferredName && this.profile.preferredName.trim().length > 0;
     }
 
     // Generate context for AI
@@ -272,36 +319,44 @@ class ProfileManager {
 
         let context = '';
         
-        if (this.profile.name) {
-            context += `User's name: ${this.profile.name}. `;
+        if (this.profile.preferredName) {
+            context += `User's preferred name: ${this.profile.preferredName}. `;
         }
         
-        if (this.profile.age) {
-            context += `Age: ${this.profile.age}. `;
+        if (this.profile.ageRange) {
+            context += `Age range: ${this.profile.ageRange}. `;
         }
         
         if (this.profile.pronouns) {
             context += `Pronouns: ${this.profile.pronouns}. `;
         }
         
-        if (this.profile.location) {
-            context += `Location: ${this.profile.location}. `;
+        if (this.profile.diagnoses) {
+            context += `Current diagnoses: ${this.profile.diagnoses}. `;
         }
         
-        if (this.profile.therapist) {
-            context += `Therapist: ${this.profile.therapist}. `;
+        if (this.profile.medications) {
+            context += `Current medications: ${this.profile.medications}. `;
         }
         
-        if (this.profile.sessionFrequency) {
-            context += `Therapy frequency: ${this.profile.sessionFrequency}. `;
+        if (this.profile.treatmentHistory) {
+            context += `Treatment history: ${this.profile.treatmentHistory}. `;
         }
         
-        if (this.profile.mainConcerns) {
-            context += `Main concerns: ${this.profile.mainConcerns}. `;
+        if (this.profile.therapyGoals) {
+            context += `Current therapy goals: ${this.profile.therapyGoals}. `;
         }
         
-        if (this.profile.goals) {
-            context += `Goals: ${this.profile.goals}. `;
+        if (this.profile.copingStrategies) {
+            context += `Effective coping strategies: ${this.profile.copingStrategies}. `;
+        }
+        
+        if (this.profile.currentStressors) {
+            context += `Current stressors: ${this.profile.currentStressors}. `;
+        }
+        
+        if (this.profile.therapistInfo) {
+            context += `Therapist information: ${this.profile.therapistInfo}. `;
         }
 
         if (this.profile.significantPeople) {
