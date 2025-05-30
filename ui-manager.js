@@ -22,7 +22,8 @@ class UIManager {
 
     initializeSpeechManager() {
         // Initialize speech manager for voice functionality
-        if (window.SpeechManager) {
+        try {
+            // Remove the window. check - SpeechManager is loaded globally
             this.speechManager = new SpeechManager();
             
             // Set up speech manager callbacks
@@ -31,8 +32,8 @@ class UIManager {
             });
             
             console.log('SpeechManager initialized in UIManager');
-        } else {
-            console.warn('SpeechManager not available');
+        } catch (error) {
+            console.warn('SpeechManager not available:', error);
         }
     }
 
