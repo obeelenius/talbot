@@ -565,7 +565,7 @@ body {
     color: var(--text-secondary);
 }
 
-/* Profile Modal - Modern Design */
+/* Profile Modal - Updated with Sticky Buttons */
 .profile-modal {
     display: none;
     position: fixed;
@@ -593,6 +593,10 @@ body {
     box-shadow: var(--shadow-xl);
     animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    position: relative;
+    max-height: calc(100vh - 4rem); /* Ensure modal doesn't exceed viewport */
+    display: flex;
+    flex-direction: column;
 }
 
 .profile-header {
@@ -602,6 +606,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .profile-header h2 {
@@ -630,7 +637,7 @@ body {
     transform: scale(1.05);
 }
 
-/* New Conversation Modal */
+/* New Conversation Modal - Updated with Sticky Buttons */
 .conversation-modal {
     display: none;
     position: fixed;
@@ -658,6 +665,10 @@ body {
     box-shadow: var(--shadow-xl);
     animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    position: relative;
+    max-height: calc(100vh - 4rem); /* Ensure modal doesn't exceed viewport */
+    display: flex;
+    flex-direction: column;
 }
 
 .conversation-header {
@@ -667,6 +678,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .conversation-header h2 {
@@ -677,6 +691,9 @@ body {
 
 .conversation-body {
     padding: var(--spacing-2xl);
+    overflow-y: auto;
+    flex: 1;
+    padding-bottom: 120px; /* Make room for sticky buttons */
 }
 
 .conversation-info {
@@ -812,15 +829,24 @@ body {
     transform: none;
 }
 
+/* Sticky Conversation Actions */
 .conversation-actions {
-    padding: var(--spacing-xl) var(--spacing-2xl);
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
     border-top: 1px solid var(--border-light);
+    padding: var(--spacing-xl) var(--spacing-2xl);
     text-align: center;
+    z-index: 10;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Form Styles */
+/* Form Styles - Updated for scrollable content */
 .profile-form {
     padding: var(--spacing-2xl);
+    overflow-y: auto;
+    flex: 1;
+    padding-bottom: 120px; /* Make room for sticky buttons */
 }
 
 .form-section {
@@ -988,13 +1014,18 @@ body {
     background: var(--burgundy-600);
 }
 
+/* Sticky Profile Actions */
 .profile-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border-light);
+    padding: var(--spacing-xl) var(--spacing-2xl);
     display: flex;
     gap: var(--spacing-md);
     justify-content: flex-end;
-    padding-top: var(--spacing-xl);
-    border-top: 1px solid var(--border-light);
-    margin-top: var(--spacing-xl);
+    z-index: 10;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Checkbox Styles */
