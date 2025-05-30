@@ -1,16 +1,28 @@
-// UI Manager - Handle Interface Updates and Message Display with Duplicate Prevention
+// UI Manager - Handle Interface Updates and Message Display with Improved Duplicate Prevention
 class UIManager {
     constructor() {
         this.messages = [];
         this.isTyping = false;
         this.speechManager = null;
         
+        // Duplicate prevention flags
+        this.isProcessingSend = false;
+        this.lastSendTime = 0;
+        this.preventDuplicateTimeout = null;
+        
+        // Event handler bindings - store references to avoid duplication
+        this._boundSendClick = null;
+        this._boundKeyDown = null;
+        this._boundInput = null;
+        
         this.initializeElements();
-        this.bindEvents();
         this.loadChatHistory();
         this.initializeSpeechManager();
         
-        console.log('UIManager initialized');
+        // Bind events AFTER everything else is initialized
+        this.bindEvents();
+        
+        console.log('UIManager initialized with enhanced duplicate prevention');
     }
 
     initializeElements() {
@@ -36,112 +48,152 @@ class UIManager {
         }
     }
 
-    // FIXED: Event binding with comprehensive duplicate prevention
     bindEvents() {
-        // Duplicate prevention tracking
-        let isProcessingSend = false;
-        let lastSendTime = 0;
+        console.log('📝 Binding UI events with enhanced duplicate prevention...');
         
-        // Safe send function with comprehensive duplicate prevention
-        const safeSendMessage = (source) => {
-            const now = Date.now();
-            
-            // Prevent rapid-fire sends (within 300ms)
-            if (now - lastSendTime < 300) {
-                console.log(`🛑 RAPID FIRE PREVENTED from ${source}`);
-                return;
-            }
-            
-            // Prevent concurrent sends
-            if (isProcessingSend) {
-                console.log(`🛑 CONCURRENT SEND PREVENTED from ${source}`);
-                return;
-            }
-            
-            console.log(`📤 Processing send from ${source}`);
-            
-            isProcessingSend = true;
-            lastSendTime = now;
-            
-            try {
-                this.handleSendMessage();
-            } catch (error) {
-                console.error('Error in handleSendMessage:', error);
-            } finally {
-                // Reset the processing flag after a short delay
-                setTimeout(() => {
-                    isProcessingSend = false;
-                }, 200);
-            }
-        };
-
-        // Send button - with duplicate prevention
+        // Clear any previously bound events to prevent duplicates
+        this.unbindEvents();
+        
+        // Send button with enhanced duplicate prevention
         if (this.sendButton) {
-            this.sendButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                safeSendMessage('click');
-            }, { passive: false });
+            this._boundSendClick = this.handleSendButtonClick.bind(this);
+            this.sendButton.addEventListener('click', this._boundSendClick);
         }
 
-        // Enter key to send - with duplicate prevention  
+        // Enter key to send with enhanced duplicate prevention
         if (this.messageInput) {
-            this.messageInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    safeSendMessage('keydown');
-                }
-            }, { passive: false });
-
-            // Auto-resize textarea AND notify speech manager
-            this.messageInput.addEventListener('input', () => {
-                this.autoResizeTextarea();
-                
-                // Notify speech manager that user is typing (stop speech if needed)
-                if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
-                    this.speechManager.handleUserTyping();
-                }
-            }, { passive: true });
+            this._boundKeyDown = this.handleInputKeyDown.bind(this);
+            this.messageInput.addEventListener('keydown', this._boundKeyDown);
+            
+            // Auto-resize textarea and notify speech manager on input
+            this._boundInput = this.handleInputChange.bind(this);
+            this.messageInput.addEventListener('input', this._boundInput);
         }
         
-        console.log('✅ UI Manager events bound with duplicate prevention');
+        console.log('✅ UI events bound with enhanced duplicate prevention');
+    }
+    
+    // Method to remove event listeners (to prevent duplicates)
+    unbindEvents() {
+        if (this.sendButton && this._boundSendClick) {
+            this.sendButton.removeEventListener('click', this._boundSendClick);
+        }
+        
+        if (this.messageInput && this._boundKeyDown) {
+            this.messageInput.removeEventListener('keydown', this._boundKeyDown);
+        }
+        
+        if (this.messageInput && this._boundInput) {
+            this.messageInput.removeEventListener('input', this._boundInput);
+        }
+    }
+    
+    // Event handlers with proper binding
+    handleSendButtonClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.processSendMessage('button_click');
+    }
+    
+    handleInputKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.processSendMessage('enter_key');
+        }
+    }
+    
+    handleInputChange() {
+        this.autoResizeTextarea();
+        
+        // Notify speech manager about typing
+        if (this.speechManager && typeof this.speechManager.handleUserTyping === 'function') {
+            this.speechManager.handleUserTyping();
+        }
     }
 
-    handleSendMessage() {
-        const message = this.messageInput?.value?.trim();
-        if (!message) {
-            console.log('🛑 No message to send (empty input)');
+    // Enhanced duplicate prevention with robust timeouts
+    processSendMessage(source) {
+        const now = Date.now();
+        
+        // Log attempt for debugging
+        console.log(`🔄 Send attempt from: ${source}, processing: ${this.isProcessingSend}, time since last: ${now - this.lastSendTime}ms`);
+        
+        // Multiple layers of duplicate prevention
+        if (this.isProcessingSend) {
+            console.log(`🛑 BLOCKED: Already processing a send operation (${source})`);
             return;
         }
-
-        console.log('📤 handleSendMessage processing:', message.substring(0, 50) + '...');
-
-        // Clear input FIRST to prevent re-submission
-        const originalMessage = message;
-        if (this.messageInput) {
-            this.messageInput.value = '';
-            this.autoResizeTextarea();
-        }
-
-        // Add user message to UI
-        this.addMessage(originalMessage, 'user');
         
-        // Trigger AI response
-        this.getAIResponse(originalMessage);
+        if (now - this.lastSendTime < 800) {
+            console.log(`🛑 BLOCKED: Send operation too soon after previous (${source})`);
+            return;
+        }
+        
+        // Get message before any processing
+        const message = this.messageInput?.value?.trim() || '';
+        if (!message) {
+            console.log('⚠️ No message to send (empty input)');
+            return;
+        }
+        
+        // Set flags immediately to prevent race conditions
+        this.isProcessingSend = true;
+        this.lastSendTime = now;
+        
+        // Clear any existing timeout
+        if (this.preventDuplicateTimeout) {
+            clearTimeout(this.preventDuplicateTimeout);
+        }
+        
+        // Execute the send operation
+        this.executeMessageSend(message, source);
+        
+        // Set a timeout to release the lock (failsafe)
+        this.preventDuplicateTimeout = setTimeout(() => {
+            if (this.isProcessingSend) {
+                console.log('🔓 Releasing processing lock (timeout)');
+                this.isProcessingSend = false;
+            }
+        }, 3000); // 3 seconds max lock
+    }
+    
+    executeMessageSend(message, source) {
+        console.log(`📤 Sending message from ${source}:`, message.substring(0, 30) + (message.length > 30 ? '...' : ''));
+        
+        try {
+            // Clear input field immediately to prevent re-submission
+            if (this.messageInput) {
+                this.messageInput.value = '';
+                this.autoResizeTextarea();
+                this.messageInput.focus();
+            }
+            
+            // Add user message to UI
+            this.addMessage(message, 'user');
+            
+            // Trigger AI response
+            this.getAIResponse(message);
+            
+        } catch (error) {
+            console.error('Error sending message:', error);
+        } finally {
+            // Always release the processing lock after a short delay
+            setTimeout(() => {
+                console.log('🔓 Releasing processing lock (completed)');
+                this.isProcessingSend = false;
+            }, 500); // Short delay to prevent immediate re-sends
+        }
     }
 
     handleVoiceInput(text) {
         // Handle voice input from speech manager
         if (!text) return;
         
-        console.log('🎤 Voice input received:', text);
+        console.log('🎤 Voice input received');
         
-        // Add user message to UI
-        this.addMessage(text, 'user');
-        
-        // Trigger AI response
-        this.getAIResponse(text);
+        // Use the same duplicate prevention mechanism for voice input
+        this.processSendMessage('voice_input');
     }
 
     async getAIResponse(message) {
@@ -400,51 +452,18 @@ class UIManager {
         return this.messages.filter(m => m.sender === 'assistant');
     }
 
-    // Message editing/deletion (for future features)
-    editMessage(messageId, newContent) {
-        const messageIndex = this.messages.findIndex(m => m.id === messageId);
-        if (messageIndex !== -1) {
-            this.messages[messageIndex].content = newContent;
-            this.messages[messageIndex].edited = true;
-            this.messages[messageIndex].editedAt = new Date().toISOString();
-            this.saveChatHistory();
-            this.renderChatHistory();
-        }
+    // Speech manager access
+    getSpeechManager() {
+        return this.speechManager;
     }
 
-    deleteMessage(messageId) {
-        this.messages = this.messages.filter(m => m.id !== messageId);
-        this.saveChatHistory();
-        this.renderChatHistory();
+    // Voice settings methods for backward compatibility
+    getVoiceMode() {
+        return this.speechManager?.getVoiceMode() || 0;
     }
 
-    // Export chat functionality
-    exportChat() {
-        const chatData = {
-            exportDate: new Date().toISOString(),
-            messageCount: this.messages.length,
-            messages: this.messages
-        };
-
-        const dataStr = JSON.stringify(chatData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(dataBlob);
-        link.download = `talbot-chat-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    // Search functionality
-    searchMessages(query) {
-        if (!query) return [];
-
-        const lowercaseQuery = query.toLowerCase();
-        return this.messages.filter(message =>
-            message.content.toLowerCase().includes(lowercaseQuery)
-        );
+    isVoiceAvailable() {
+        return !!this.speechManager;
     }
 
     // Message statistics
@@ -461,19 +480,5 @@ class UIManager {
             firstMessage: this.messages[0]?.timestamp || null,
             lastMessage: this.messages[this.messages.length - 1]?.timestamp || null
         };
-    }
-
-    // Speech manager access
-    getSpeechManager() {
-        return this.speechManager;
-    }
-
-    // Voice settings methods for backward compatibility
-    getVoiceMode() {
-        return this.speechManager?.getVoiceMode() || 0;
-    }
-
-    isVoiceAvailable() {
-        return !!this.speechManager;
     }
 }
