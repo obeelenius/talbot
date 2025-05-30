@@ -1021,7 +1021,7 @@ body {
     background: var(--burgundy-600);
 }
 
-/* Sticky Profile Actions */
+/* Sticky Profile Actions - Fixed to match conversation modal */
 .profile-actions {
     position: sticky;
     bottom: 0;
