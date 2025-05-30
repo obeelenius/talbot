@@ -1,4 +1,4 @@
-// Conversation Manager - Handle New Conversations with Smart Context
+// Conversation Manager - Handle New Conversations with Smart Context (Improved)
 class ConversationManager {
     constructor(uiManager, profileManager) {
         this.uiManager = uiManager;
@@ -19,6 +19,10 @@ class ConversationManager {
         this.keepContextButton = document.getElementById('keep-context-button');
         this.completeResetButton = document.getElementById('complete-reset-button');
         this.cancelConversationButton = document.getElementById('cancel-conversation-button');
+        
+        // IMPROVEMENT: Cache these elements to avoid repeated DOM lookups
+        this.messageCountElement = document.getElementById('message-count');
+        this.contextPreview = document.getElementById('context-preview');
     }
 
     bindEvents() {
@@ -63,7 +67,8 @@ class ConversationManager {
         
         // Show modal
         this.conversationModal.classList.add('active');
-        document.body.style.overflow = 'hidden';
+        // IMPROVEMENT: Use CSS class for body overflow for cleaner separation
+        document.body.classList.add('modal-open'); 
         
         console.log('Conversation modal opened');
     }
@@ -72,26 +77,28 @@ class ConversationManager {
         if (!this.conversationModal) return;
         
         this.conversationModal.classList.remove('active');
-        document.body.style.overflow = '';
+        // IMPROVEMENT: Use CSS class for body overflow
+        document.body.classList.remove('modal-open'); 
         
         console.log('Conversation modal closed');
     }
 
     updateModalContent() {
-        const messageCount = this.uiManager.getMessageCount();
-        const hasMessages = this.uiManager.hasMessages();
+        // Ensure uiManager is available before calling its methods
+        const messageCount = this.uiManager ? this.uiManager.getMessageCount() : 0;
+        const hasMessages = this.uiManager ? this.uiManager.hasMessages() : false;
         
         // Update message count in modal
-        const messageCountElement = document.getElementById('message-count');
-        if (messageCountElement) {
-            messageCountElement.textContent = messageCount;
+        // IMPROVEMENT: Use cached element
+        if (this.messageCountElement) {
+            this.messageCountElement.textContent = messageCount;
         }
 
         // Update context preview
-        const contextPreview = document.getElementById('context-preview');
-        if (contextPreview) {
+        // IMPROVEMENT: Use cached element
+        if (this.contextPreview) {
             const preview = this.generateContextPreview();
-            contextPreview.textContent = preview;
+            this.contextPreview.textContent = preview;
         }
 
         // Disable buttons if no conversation exists
@@ -105,7 +112,8 @@ class ConversationManager {
     }
 
     generateContextPreview() {
-        const messages = this.uiManager.getMessages();
+        // Ensure uiManager is available before calling its methods
+        const messages = this.uiManager ? this.uiManager.getMessages() : [];
         
         if (!messages || messages.length === 0) {
             return "No conversation context to preserve yet.";
@@ -152,8 +160,8 @@ class ConversationManager {
             // Save current conversation context before clearing
             this.saveConversationContext();
             
-            // Clear only the message history
-            this.clearMessageHistory();
+            // IMPROVEMENT: Call uiManager's method to clear history
+            this.clearMessageHistory(); 
             
             // Show success message
             this.showSuccessMessage('New conversation started! Talbot remembers your previous topics.', 'context-kept');
@@ -189,7 +197,8 @@ class ConversationManager {
         
         try {
             // Clear everything
-            this.clearMessageHistory();
+            // IMPROVEMENT: Call uiManager's method to clear history
+            this.clearMessageHistory(); 
             this.clearConversationMemory();
             
             // Show success message
@@ -207,7 +216,8 @@ class ConversationManager {
     }
 
     saveConversationContext() {
-        const messages = this.uiManager.getMessages();
+        // Ensure uiManager is available before calling its methods
+        const messages = this.uiManager ? this.uiManager.getMessages() : [];
         
         if (!messages || messages.length === 0) {
             console.log('No messages to save context from');
@@ -302,24 +312,25 @@ class ConversationManager {
         return themes;
     }
 
+    // FIX FOR DUPLICATE MESSAGE ISSUE: Delegate clearing to UIManager
     clearMessageHistory() {
-        // Clear UI messages
-        this.uiManager.messages = [];
-        
-        // Clear localStorage chat history
-        localStorage.removeItem('talbot-chat-history');
-        
-        // Reset UI to welcome state
-        if (this.uiManager.messagesContainer) {
-            this.uiManager.messagesContainer.innerHTML = `
-                <div class="welcome-message">
-                    <h2>Hi, I'm Talbot</h2>
-                    <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
-                </div>
-            `;
+        if (this.uiManager && typeof this.uiManager.clearMessages === 'function') {
+            this.uiManager.clearMessages(); // Call UIManager's method to handle its own state and DOM
+            console.log('Message history cleared via UIManager');
+        } else {
+            console.error('UIManager or its clearMessages method not available. Cannot clear message history.');
+            // Fallback for extreme cases, though uiManager should always be available
+            this.uiManager.messages = []; // Old problematic line, keep as last resort fallback if uiManager is null
+            if (this.uiManager.messagesContainer) { // Old problematic line, keep as last resort fallback
+                this.uiManager.messagesContainer.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>Hi, I'm Talbot</h2>
+                        <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
+                    </div>
+                `;
+            }
+            localStorage.removeItem('talbot-chat-history'); // Old problematic line, keep as last resort fallback
         }
-        
-        console.log('Message history cleared');
     }
 
     clearConversationMemory() {
@@ -342,58 +353,55 @@ class ConversationManager {
         }
     }
 
-    showSuccessMessage(text, type = 'success') {
+    // IMPROVEMENT: Refactored to reduce duplication and use CSS classes for styling
+    _showMessage(text, type, duration) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `conversation-status ${type}`;
+        // Use CSS classes instead of inline styles for better separation of concerns
+        messageDiv.className = `conversation-status ${type}`; 
         messageDiv.textContent = text;
-        messageDiv.style.cssText = `
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1002; background: #27ae60; color: white;
-            padding: 12px 24px; border-radius: 8px; font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-family: 'Lora', serif;
-            max-width: 400px; text-align: center;
-            opacity: 0; transition: all 0.3s ease;
-        `;
         
+        // NOTE: The actual CSS for .conversation-status, .success, and .error classes 
+        // should be defined in your CSS file (e.g., style.css).
+        // Example CSS:
+        /*
+        .conversation-status {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1002; padding: 12px 24px; border-radius: 8px; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-family: 'Lora', serif;
+            max-width: 400px; text-align: center; opacity: 0; 
+            transition: all 0.3s ease;
+        }
+        .conversation-status.success {
+            background: #27ae60; color: white;
+        }
+        .conversation-status.error {
+            background: #e74c3c; color: white;
+        }
+        .conversation-status.active { // For fade-in
+            opacity: 1;
+        }
+        */
+
         document.body.appendChild(messageDiv);
         
         // Show with animation
         setTimeout(() => {
-            messageDiv.style.opacity = '1';
+            messageDiv.classList.add('active'); // Add active class to trigger fade-in
         }, 100);
         
         // Hide after delay
         setTimeout(() => {
-            messageDiv.style.opacity = '0';
+            messageDiv.classList.remove('active'); // Remove active class to trigger fade-out
             setTimeout(() => messageDiv.remove(), 300);
-        }, 4000);
+        }, duration);
+    }
+
+    showSuccessMessage(text, type = 'success') {
+        this._showMessage(text, type, 4000);
     }
 
     showErrorMessage(text) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'conversation-status error';
-        messageDiv.textContent = text;
-        messageDiv.style.cssText = `
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1002; background: #e74c3c; color: white;
-            padding: 12px 24px; border-radius: 8px; font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-family: 'Lora', serif;
-            max-width: 400px; text-align: center;
-            opacity: 0; transition: all 0.3s ease;
-        `;
-        
-        document.body.appendChild(messageDiv);
-        
-        // Show with animation
-        setTimeout(() => {
-            messageDiv.style.opacity = '1';
-        }, 100);
-        
-        // Hide after delay
-        setTimeout(() => {
-            messageDiv.style.opacity = '0';
-            setTimeout(() => messageDiv.remove(), 300);
-        }, 5000);
+        this._showMessage(text, 'error', 5000);
     }
 
     // Public API methods
