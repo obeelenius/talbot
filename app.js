@@ -4,7 +4,7 @@ class TalbotApp {
         this.uiManager = null;
         this.profileManager = null;
         this.conversationManager = null;
-        this.aiHandler = null;
+        this.aiResponseManager = null;
         
         this.init();
     }
@@ -47,8 +47,8 @@ class TalbotApp {
         // Initialize Conversation Manager
         this.conversationManager = new ConversationManager(this.uiManager, this.profileManager);
         
-        // Initialize AI Handler last (depends on other managers)
-        this.aiHandler = new AIHandler(this.uiManager, this.profileManager, this.conversationManager);
+        // Initialize AI Response Manager (using your existing structure)
+        this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
     }
 
     setupGlobalReferences() {
@@ -57,7 +57,10 @@ class TalbotApp {
         window.uiManager = this.uiManager;
         window.profileManager = this.profileManager;
         window.conversationManager = this.conversationManager;
-        window.aiHandler = this.aiHandler;
+        window.aiResponseManager = this.aiResponseManager;
+        
+        // For backward compatibility, also set aiHandler to point to aiResponseManager
+        window.aiHandler = this.aiResponseManager;
     }
 
     initializeAppState() {
@@ -175,7 +178,7 @@ class TalbotApp {
                 uiManager: !!this.uiManager,
                 profileManager: !!this.profileManager,
                 conversationManager: !!this.conversationManager,
-                aiHandler: !!this.aiHandler
+                aiResponseManager: !!this.aiResponseManager
             },
             localStorage: this.checkLocalStorageAccess(),
             domElements: this.checkCriticalElements()
@@ -185,7 +188,7 @@ class TalbotApp {
         console.log('Health check:', healthStatus);
 
         // Take corrective action if needed
-        if (!healthStatus.managers.uiManager || !healthStatus.managers.aiHandler) {
+        if (!healthStatus.managers.uiManager || !healthStatus.managers.aiResponseManager) {
             console.warn('Critical managers missing, attempting re-initialization...');
             this.attemptRecovery();
         }
@@ -222,9 +225,10 @@ class TalbotApp {
                 window.uiManager = this.uiManager;
             }
             
-            if (!this.aiHandler) {
-                this.aiHandler = new AIHandler(this.uiManager, this.profileManager, this.conversationManager);
-                window.aiHandler = this.aiHandler;
+            if (!this.aiResponseManager) {
+                this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
+                window.aiResponseManager = this.aiResponseManager;
+                window.aiHandler = this.aiResponseManager;
             }
             
             console.log('Recovery attempt completed');
@@ -289,12 +293,12 @@ class TalbotApp {
     // Public API methods
     getAppStatus() {
         return {
-            initialized: !!(this.uiManager && this.profileManager && this.conversationManager && this.aiHandler),
+            initialized: !!(this.uiManager && this.profileManager && this.conversationManager && this.aiResponseManager),
             managers: {
                 uiManager: !!this.uiManager,
                 profileManager: !!this.profileManager,
                 conversationManager: !!this.conversationManager,
-                aiHandler: !!this.aiHandler
+                aiResponseManager: !!this.aiResponseManager
             },
             hasProfile: this.profileManager?.hasProfile() || false,
             hasMessages: this.uiManager?.hasMessages() || false,
@@ -310,7 +314,7 @@ class TalbotApp {
             conversationMemory: this.conversationManager?.getConversationMemory() || null,
             stats: {
                 messageStats: this.uiManager?.getMessageStats() || null,
-                conversationStats: this.aiHandler?.getConversationStats() || null
+                conversationStats: this.aiResponseManager?.getConversationStats() || null
             }
         };
 
