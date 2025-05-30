@@ -3,19 +3,37 @@ class UIManager {
     constructor() {
         this.messages = [];
         this.isTyping = false;
+        this.speechManager = null;
         
         this.initializeElements();
         this.bindEvents();
         this.loadChatHistory();
+        this.initializeSpeechManager();
         
         console.log('UIManager initialized');
     }
 
     initializeElements() {
-        this.messagesContainer = document.getElementById('messages-container');
+        this.messagesContainer = document.getElementById('messages');
         this.messageInput = document.getElementById('message-input');
         this.sendButton = document.getElementById('send-button');
         this.typingIndicator = document.getElementById('typing-indicator');
+    }
+
+    initializeSpeechManager() {
+        // Initialize speech manager for voice functionality
+        if (window.SpeechManager) {
+            this.speechManager = new SpeechManager();
+            
+            // Set up speech manager callbacks
+            this.speechManager.setOnSpeechResult((text) => {
+                this.handleVoiceInput(text);
+            });
+            
+            console.log('SpeechManager initialized in UIManager');
+        } else {
+            console.warn('SpeechManager not available');
+        }
     }
 
     bindEvents() {
@@ -51,14 +69,49 @@ class UIManager {
             this.autoResizeTextarea();
         }
 
-        // Trigger AI response (this will be called by the main app)
-        if (window.aiHandler) {
-            // Check for crisis keywords first
-            if (window.aiHandler.detectCrisisKeywords(message)) {
-                window.aiHandler.handleUserInput(message, 'crisis');
+        // Trigger AI response
+        this.getAIResponse(message);
+    }
+
+    handleVoiceInput(text) {
+        // Handle voice input from speech manager
+        if (!text) return;
+        
+        // Add user message to UI
+        this.addMessage(text, 'user');
+        
+        // Trigger AI response
+        this.getAIResponse(text);
+    }
+
+    async getAIResponse(message) {
+        try {
+            // Show typing indicator
+            this.showTypingIndicator();
+            
+            // Get AI response
+            if (window.aiResponseManager) {
+                const response = await window.aiResponseManager.getAIResponse(message);
+                
+                // Hide typing indicator
+                this.hideTypingIndicator();
+                
+                // Add AI response to UI
+                this.addMessage(response, 'assistant');
+                
+                // Speak the response if voice is enabled
+                if (this.speechManager) {
+                    await this.speechManager.speakMessage(response);
+                }
             } else {
-                window.aiHandler.handleUserInput(message, 'message');
+                console.error('AI Response Manager not available');
+                this.hideTypingIndicator();
+                this.addMessage("I'm having trouble connecting right now. Please try again.", 'assistant');
             }
+        } catch (error) {
+            console.error('Error getting AI response:', error);
+            this.hideTypingIndicator();
+            this.addMessage("I'm having trouble responding right now. Please try again.", 'assistant');
         }
     }
 
@@ -90,12 +143,25 @@ class UIManager {
             minute: '2-digit'
         });
 
-        messageElement.innerHTML = `
-            <div class="message-content">
-                <div class="message-text">${this.formatMessageContent(messageObj.content)}</div>
-                <div class="message-time">${timeString}</div>
-            </div>
+        // Create avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        if (messageObj.sender === 'user') {
+            avatar.innerHTML = 'U';
+        } else {
+            avatar.innerHTML = 't';
+        }
+
+        // Create content
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.innerHTML = `
+            <div class="message-text">${this.formatMessageContent(messageObj.content)}</div>
+            <div class="message-time">${timeString}</div>
         `;
+
+        messageElement.appendChild(avatar);
+        messageElement.appendChild(content);
 
         // Remove welcome message if it exists
         const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
@@ -121,7 +187,7 @@ class UIManager {
         this.isTyping = true;
         
         if (this.typingIndicator) {
-            this.typingIndicator.style.display = 'block';
+            this.typingIndicator.style.display = 'flex';
             this.scrollToBottom();
         } else {
             // Create typing indicator if it doesn't exist
@@ -142,14 +208,15 @@ class UIManager {
 
         const typingElement = document.createElement('div');
         typingElement.id = 'typing-indicator';
-        typingElement.className = 'message assistant typing';
+        typingElement.className = 'typing-indicator';
         typingElement.innerHTML = `
-            <div class="message-content">
-                <div class="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
+            <div class="message-avatar">
+                <span>t</span>
+            </div>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
             </div>
         `;
 
@@ -334,5 +401,19 @@ class UIManager {
             firstMessage: this.messages[0]?.timestamp || null,
             lastMessage: this.messages[this.messages.length - 1]?.timestamp || null
         };
+    }
+
+    // Speech manager access
+    getSpeechManager() {
+        return this.speechManager;
+    }
+
+    // Voice settings methods for backward compatibility
+    getVoiceMode() {
+        return this.speechManager?.getVoiceMode() || 0;
+    }
+
+    isVoiceAvailable() {
+        return !!this.speechManager;
     }
 }
