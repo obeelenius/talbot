@@ -7,30 +7,43 @@ class AIResponseManager {
         console.log('AIResponseManager initialized with behavioral rules');
     }
 
-    async getAIResponse(message) {
+    async getAIResponse(message) { // 'message' here is the original user text
         try {
             console.log('AIResponseManager: Getting response for message:', message);
             
-            // Track message count for name usage
             this.profileManager.incrementMessageCount();
             
-            // Check for crisis keywords first
             if (this.detectCrisisKeywords(message)) {
                 console.log('AIResponseManager: Crisis keywords detected');
                 return this.getCrisisResponse();
             }
             
-            // Get conversation history from UI manager
-            const conversationHistory = this.uiManager.getMessages();
-            console.log(`AIResponseManager: Including ${conversationHistory.length} previous messages`);
+            // Get conversation history from UI manager. It includes the current 'message'.
+            let rawConversationHistory = this.uiManager.getMessages();
+            // Create a mutable copy of the history.
+            let conversationHistoryForAPI = [...rawConversationHistory];
+
+            // --- BEGIN FIX for message duplication ---
+            // Check if the last message in history is indeed the current user message.
+            if (conversationHistoryForAPI.length > 0) {
+                const lastMessageInHistory = conversationHistoryForAPI[conversationHistoryForAPI.length - 1];
+                // 'message' is the raw text from the user input in this scope.
+                if (lastMessageInHistory.sender === 'user' && lastMessageInHistory.content === message) {
+                    // Remove the current message (last item) from the history array
+                    // because chat.js will add it from the main 'message' parameter.
+                    conversationHistoryForAPI.pop(); 
+                    console.log('AIResponseManager: Adjusted conversation history. Removed current message to prevent duplication with the main message parameter for the API call.');
+                }
+            }
+            // --- END FIX for message duplication ---
             
-            // Call the API with conversation history and behavioral context
-            const response = await this.callAIAPI(message, conversationHistory);
+            console.log(`AIResponseManager: Including ${conversationHistoryForAPI.length} previous messages for API call`);
+            
+            // Pass the original 'message' and the now-adjusted 'conversationHistoryForAPI'
+            const response = await this.callAIAPI(message, conversationHistoryForAPI);
             console.log('AIResponseManager: Got API response');
             
-            // Process response through behavioral filters
             const processedResponse = this.processAIResponse(response);
-            
             return processedResponse;
             
         } catch (error) {
@@ -40,10 +53,10 @@ class AIResponseManager {
     }
 
     // Method to call the Netlify function with enhanced context and behavioral rules
-    async callAIAPI(message, conversationHistory = []) {
+    async callAIAPI(originalUserMessage, conversationHistory = []) {
         try {
-            // Build enhanced contextual message with behavioral guidelines
-            const enhancedContext = this.buildEnhancedContext(message);
+            // buildEnhancedContext uses originalUserMessage to create enhancedContext.message
+            const enhancedContext = this.buildEnhancedContext(originalUserMessage);
             console.log('AIResponseManager: Calling API with enhanced context and behavioral rules');
             
             const response = await fetch('/.netlify/functions/chat', {
@@ -52,9 +65,9 @@ class AIResponseManager {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: enhancedContext.message,
+                    message: enhancedContext.message, // This is the one that will be explicitly added by chat.js
                     profile: this.profileManager.getProfile(),
-                    conversationHistory: conversationHistory,
+                    conversationHistory: conversationHistory, // This should NOW NOT contain the current message
                     systemPrompt: enhancedContext.systemPrompt,
                     behavioralRules: enhancedContext.behavioralRules
                 })
@@ -71,7 +84,6 @@ class AIResponseManager {
             const data = await response.json();
             console.log('AIResponseManager: API response data received');
             
-            // Check if it's a fallback response from the function
             if (data.fallback) {
                 console.log('AIResponseManager: Function returned fallback response');
                 throw new Error('Function returned fallback');
@@ -86,13 +98,8 @@ class AIResponseManager {
     }
 
     buildEnhancedContext(message) {
-        // Build system prompt with behavioral rules
         const systemPrompt = this.buildSystemPrompt();
-        
-        // Get contextual message from profile manager
         const contextualMessage = this.profileManager.buildContextualMessage(message);
-        
-        // Build behavioral rules object
         const behavioralRules = this.buildBehavioralRules();
         
         return {
@@ -125,13 +132,11 @@ CRITICAL BEHAVIORAL RULES:
 
 6. AUSTRALIAN CONTEXT: Use Australian English and be familiar with Australian mental health resources and culture.`;
 
-        // Add profile context if available
         const profileContext = this.profileManager.getProfileContext();
         if (profileContext) {
             systemPrompt += `\n\nUSER PROFILE CONTEXT:\n${profileContext}`;
         }
 
-        // Add conversation memory if available
         if (window.conversationManager) {
             const conversationContext = window.conversationManager.getConversationContext();
             if (conversationContext) {
@@ -139,7 +144,6 @@ CRITICAL BEHAVIORAL RULES:
             }
         }
 
-        // Add name usage guidance
         const nameUsageStats = this.profileManager.getNameUsageStats();
         const userName = this.profileManager.getName();
         if (userName) {
@@ -174,21 +178,18 @@ CRITICAL BEHAVIORAL RULES:
     }
 
     processAIResponse(response) {
-        // Check if the AI used the user's name in the response
         const userName = this.profileManager.getName();
         if (userName && response.toLowerCase().includes(userName.toLowerCase())) {
             this.profileManager.markNameUsed();
             console.log('AIResponseManager: Name usage detected and tracked');
         }
 
-        // Filter out any accidental technical references
         let processedResponse = this.filterTechnicalReferences(response);
 
         return processedResponse;
     }
 
     filterTechnicalReferences(response) {
-        // List of technical terms that should never appear in responses
         const technicalTerms = [
             'openai', 'gpt', 'api', 'endpoint', 'server', 'database', 'backend',
             'frontend', 'javascript', 'python', 'node.js', 'react', 'vue',
@@ -205,12 +206,10 @@ CRITICAL BEHAVIORAL RULES:
 
         let filteredResponse = response;
 
-        // Check for technical terms and replace with generic alternatives
         technicalTerms.forEach(term => {
             const regex = new RegExp(`\\b${term}\\b`, 'gi');
             if (regex.test(filteredResponse)) {
                 console.warn(`AIResponseManager: Filtered technical term: ${term}`);
-                // Replace with generic alternatives
                 filteredResponse = filteredResponse.replace(regex, 'my systems');
             }
         });
@@ -234,7 +233,6 @@ CRITICAL BEHAVIORAL RULES:
         ];
     }
 
-    // Fallback responses for when API is completely unavailable
     getFallbackResponse() {
         const fallbackResponses = [
             "I'm here for you, even though I'm having some connection issues right now. How are you feeling?",
@@ -262,11 +260,9 @@ Your life has value, and there are ways through this pain.`;
         return crisisResponse;
     }
 
-    // Keep simulation method for complete offline fallback
     async simulateTherapeuticResponse(originalMessage, contextualMessage) {
         const message = originalMessage.toLowerCase();
         
-        // Crisis response (always prioritize this)
         if (this.detectCrisisKeywords(originalMessage)) {
             return this.getCrisisResponse();
         }
@@ -292,7 +288,6 @@ Your life has value, and there are ways through this pain.`;
             return this.getRandomResponse(TalbotConfig.RESPONSE_PATTERNS.overwhelm);
         }
 
-        // Default therapeutic response
         return this.getDefaultTherapeuticResponse();
     }
 
@@ -316,7 +311,6 @@ Your life has value, and there are ways through this pain.`;
         return this.getRandomResponse(responses);
     }
 
-    // Public API methods for integration
     getConversationStats() {
         const messages = this.uiManager.getMessages();
         const nameStats = this.profileManager.getNameUsageStats();
@@ -330,7 +324,6 @@ Your life has value, and there are ways through this pain.`;
         };
     }
 
-    // Method to handle different types of user inputs
     async handleUserInput(input, type = 'message') {
         switch (type) {
             case 'message':
