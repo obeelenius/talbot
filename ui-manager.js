@@ -1,4 +1,4 @@
-// UI Manager with Profile Photo Support and Talbot Avatar - Fixed Display Issue
+// UI Manager with Auto-send Voice Support
 class UIManager {
     constructor() {
         this.messages = [];
@@ -6,6 +6,7 @@ class UIManager {
         this.initializeElements();
         this.bindEvents();
         this.setupViewportHeight();
+        this.setupResponsivePlaceholder();
     }
 
     initializeElements() {
@@ -20,7 +21,7 @@ class UIManager {
         this.sendButton.addEventListener('click', (e) => {
             e.preventDefault();
             if (!this.isProcessingMessage) {
-                this.onSendMessage?.();
+                this.triggerSendMessage();
             }
         });
         
@@ -28,7 +29,7 @@ class UIManager {
         this.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey && !this.isProcessingMessage) {
                 e.preventDefault();
-                this.onSendMessage?.();
+                this.triggerSendMessage();
             }
         });
         
@@ -37,6 +38,18 @@ class UIManager {
             this.messageInput.style.height = 'auto';
             this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
         });
+    }
+
+    // New method to handle both manual and auto-send
+    triggerSendMessage() {
+        const message = this.getMessageInput();
+        if (!message || !message.trim()) {
+            console.log('Empty message, not sending');
+            return;
+        }
+        
+        // Call the callback with the message
+        this.onSendMessage?.(message);
     }
 
     setupViewportHeight() {
@@ -52,7 +65,39 @@ class UIManager {
         });
     }
 
-    // Enhanced addMessage with profile photo support and Talbot avatar - Fixed display
+    // Responsive placeholder text
+    setupResponsivePlaceholder() {
+        const updatePlaceholder = () => {
+            if (!this.messageInput) return;
+            
+            const width = window.innerWidth;
+            
+            if (width <= 360) {
+                // Extra narrow screens - very short placeholder
+                this.messageInput.placeholder = "What's on your mind?";
+            } else if (width <= 480) {
+                // Narrow screens - medium placeholder
+                this.messageInput.placeholder = "What's on your mind? Hold mic to speak";
+            } else if (width <= 768) {
+                // Mobile screens - shorter placeholder
+                this.messageInput.placeholder = "What's on your mind? Hold mic to speak";
+            } else {
+                // Desktop - full placeholder
+                this.messageInput.placeholder = "What's on your mind? Type or hold the mic to speak...";
+            }
+        };
+
+        // Set initial placeholder
+        updatePlaceholder();
+
+        // Update on resize
+        window.addEventListener('resize', updatePlaceholder);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(updatePlaceholder, 100);
+        });
+    }
+
+    // Enhanced addMessage with profile photo support
     addMessage(sender, content) {
         // Validate input
         if (!content || typeof content !== 'string' || !content.trim()) {
