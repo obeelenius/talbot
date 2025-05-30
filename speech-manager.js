@@ -1,4 +1,4 @@
-// Hold-to-Speak Speech Manager with Auto-Send
+// Improved Hold-to-Speak Speech Manager with Fixed Duplicate Prevention
 class SpeechManager {
     constructor() {
         this.isListening = false;
@@ -29,6 +29,21 @@ class SpeechManager {
         // Usage tracking
         this.elevenLabsCallCount = parseInt(localStorage.getItem(TalbotConfig.SETTINGS.STORAGE_KEYS.ELEVENLABS_CALLS) || '0');
         
+        // Event handler bindings - store references to avoid duplication
+        this._boundVoiceButtonMouseDown = null;
+        this._boundVoiceButtonMouseUp = null;
+        this._boundVoiceButtonMouseLeave = null;
+        this._boundVoiceButtonTouchStart = null;
+        this._boundVoiceButtonTouchEnd = null;
+        this._boundVoiceButtonTouchCancel = null;
+        this._boundVoiceSettingsClick = null;
+        this._boundVoiceRangeInput = null;
+        
+        // Callback function references
+        this.onListeningStart = null;
+        this.onSpeechResult = null;
+        
+        // Initialize in proper order
         this.initializeElements();
         this.initializeSpeech();
         this.bindEvents();
@@ -36,6 +51,348 @@ class SpeechManager {
         this.checkElevenLabsAPI();
         this.loadVoicePreference();
         this.showDevModeStatus();
+    }
+
+    // Initialize necessary elements with null checks
+    initializeElements() {
+        this.voiceButton = document.getElementById('voice-button');
+        this.statusText = document.getElementById('status-text');
+        this.statusIndicator = document.getElementById('status-indicator');
+        this.messageInput = document.getElementById('message-input');
+        this.voiceSettingsButton = document.getElementById('voice-settings-button');
+        this.voiceSliderContainer = document.getElementById('voice-slider-container');
+        this.voiceRange = document.getElementById('voice-range');
+    }
+    
+    // Improved initialization of speech recognition
+    initializeSpeech() {
+        this.initializeSpeechRecognition();
+        this.initializeSpeechSynthesis();
+    }
+
+    initializeSpeechRecognition() {
+        // Check if speech recognition is available
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            // Create a new instance to ensure clean state
+            if (this.recognition) {
+                try {
+                    this.recognition.stop();
+                } catch (e) {
+                    // Ignore errors from stopping
+                }
+            }
+            
+            this.recognition = new SpeechRecognition();
+            
+            // Hold-to-speak settings
+            this.recognition.continuous = true;        // Keep listening while held
+            this.recognition.interimResults = true;    // Show live transcription
+            this.recognition.lang = 'en-AU';
+            this.recognition.maxAlternatives = 1;
+            
+            // Set up event handlers with proper binding
+            this.recognition.onstart = () => {
+                this.isListening = true;
+                this.recordingStartTime = Date.now();
+                this.interimTranscript = '';
+                this.finalTranscript = '';
+                this.updateVoiceButton();
+                this.updateStatus('Listening... (hold button)', '👂');
+                this.updateMessageInputPlaceholder('Listening...');
+                console.log('🎤 Hold-to-speak started');
+            };
+            
+            this.recognition.onresult = (event) => {
+                this.interimTranscript = '';
+                this.finalTranscript = '';
+                
+                // Process all results
+                for (let i = 0; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        this.finalTranscript += transcript + ' ';
+                    } else {
+                        this.interimTranscript += transcript;
+                    }
+                }
+                
+                // Show live transcription in input field
+                const fullTranscript = this.finalTranscript + this.interimTranscript;
+                
+                // Only update the input if it exists
+                if (this.messageInput) {
+                    this.messageInput.value = fullTranscript.trim();
+                    
+                    // Auto-resize the input as text grows
+                    this.messageInput.style.height = 'auto';
+                    this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+                }
+                
+                console.log('🎤 Live transcription update');
+            };
+            
+            this.recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                
+                if (event.error === 'not-allowed') {
+                    this.showError('Microphone access denied. Please allow microphone permissions and try again.');
+                } else if (event.error === 'no-speech') {
+                    // Don't show error for no speech in hold-to-speak mode
+                    console.log('No speech detected while holding');
+                } else {
+                    this.showError('Voice recognition error. Please try again.');
+                }
+            };
+            
+            this.recognition.onend = () => {
+                console.log('🎤 Speech recognition ended');
+                this.finalizeHoldToSpeak();
+            };
+            
+        } else {
+            console.log('Speech recognition not supported on this browser');
+            
+            // Hide voice button if recognition isn't available
+            if (this.voiceButton) {
+                this.voiceButton.style.display = 'none';
+            }
+        }
+    }
+
+    initializeSpeechSynthesis() {
+        if (this.synthesis) {
+            this.loadVoices();
+            
+            // Set up voice change event handler
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = () => this.loadVoices();
+            }
+        } else {
+            console.log('Speech synthesis not supported on this browser');
+        }
+    }
+    
+    // Improved event binding to prevent duplicates
+    bindEvents() {
+        console.log('🎤 Binding speech manager events...');
+        
+        // Unbind any existing event listeners first
+        this.unbindEvents();
+        
+        // Voice settings button (collapsible)
+        if (this.voiceSettingsButton) {
+            this._boundVoiceSettingsClick = this.toggleVoiceSettings.bind(this);
+            this.voiceSettingsButton.addEventListener('click', this._boundVoiceSettingsClick);
+        }
+
+        // Voice slider events
+        if (this.voiceRange) {
+            this._boundVoiceRangeInput = (e) => {
+                this.voiceMode = parseInt(e.target.value, 10);
+                this.saveVoicePreference();
+                
+                // Show feedback message
+                const messages = {
+                    0: 'Voice muted',
+                    1: 'Female voice selected',
+                    2: 'Male voice selected'
+                };
+                
+                const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode - saving credits!)' : '';
+                this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
+            };
+            
+            this.voiceRange.addEventListener('input', this._boundVoiceRangeInput);
+        }
+
+        // Hold-to-Speak Voice button events - only if the button exists
+        if (this.voiceButton) {
+            // Mouse events for desktop
+            this._boundVoiceButtonMouseDown = (e) => {
+                e.preventDefault();
+                this.startHoldToSpeak();
+            };
+            
+            this._boundVoiceButtonMouseUp = (e) => {
+                e.preventDefault();
+                this.stopHoldToSpeak();
+            };
+            
+            this._boundVoiceButtonMouseLeave = (e) => {
+                // Stop if they drag mouse away while holding
+                this.stopHoldToSpeak();
+            };
+            
+            this.voiceButton.addEventListener('mousedown', this._boundVoiceButtonMouseDown);
+            this.voiceButton.addEventListener('mouseup', this._boundVoiceButtonMouseUp);
+            this.voiceButton.addEventListener('mouseleave', this._boundVoiceButtonMouseLeave);
+            
+            // Touch events for mobile
+            this._boundVoiceButtonTouchStart = (e) => {
+                e.preventDefault();
+                this.startHoldToSpeak();
+            };
+            
+            this._boundVoiceButtonTouchEnd = (e) => {
+                e.preventDefault();
+                this.stopHoldToSpeak();
+            };
+            
+            this._boundVoiceButtonTouchCancel = (e) => {
+                e.preventDefault();
+                this.stopHoldToSpeak();
+            };
+            
+            this.voiceButton.addEventListener('touchstart', this._boundVoiceButtonTouchStart);
+            this.voiceButton.addEventListener('touchend', this._boundVoiceButtonTouchEnd);
+            this.voiceButton.addEventListener('touchcancel', this._boundVoiceButtonTouchCancel);
+        }
+        
+        console.log('✅ Speech manager events bound');
+    }
+    
+    // Remove all event listeners to prevent duplicates
+    unbindEvents() {
+        if (this.voiceSettingsButton && this._boundVoiceSettingsClick) {
+            this.voiceSettingsButton.removeEventListener('click', this._boundVoiceSettingsClick);
+        }
+        
+        if (this.voiceRange && this._boundVoiceRangeInput) {
+            this.voiceRange.removeEventListener('input', this._boundVoiceRangeInput);
+        }
+        
+        if (this.voiceButton) {
+            // Mouse events
+            if (this._boundVoiceButtonMouseDown) {
+                this.voiceButton.removeEventListener('mousedown', this._boundVoiceButtonMouseDown);
+            }
+            
+            if (this._boundVoiceButtonMouseUp) {
+                this.voiceButton.removeEventListener('mouseup', this._boundVoiceButtonMouseUp);
+            }
+            
+            if (this._boundVoiceButtonMouseLeave) {
+                this.voiceButton.removeEventListener('mouseleave', this._boundVoiceButtonMouseLeave);
+            }
+            
+            // Touch events
+            if (this._boundVoiceButtonTouchStart) {
+                this.voiceButton.removeEventListener('touchstart', this._boundVoiceButtonTouchStart);
+            }
+            
+            if (this._boundVoiceButtonTouchEnd) {
+                this.voiceButton.removeEventListener('touchend', this._boundVoiceButtonTouchEnd);
+            }
+            
+            if (this._boundVoiceButtonTouchCancel) {
+                this.voiceButton.removeEventListener('touchcancel', this._boundVoiceButtonTouchCancel);
+            }
+        }
+    }
+    
+    // Method to handle user typing notification from UI Manager
+    handleUserTyping() {
+        // Stop speaking if Talbot is talking when user starts typing
+        if (this.isSpeaking) {
+            console.log('🔇 User started typing - stopping speech');
+            this.stopSpeaking();
+        }
+    }
+
+    // Hold-to-Speak Methods with improved duplicate prevention
+    startHoldToSpeak() {
+        // Prevent starting multiple listening sessions
+        if (!this.recognition || this.isListening || this.isHolding) {
+            console.log('🎤 Hold-to-speak blocked - already active or recognition not available');
+            return;
+        }
+        
+        this.isHolding = true;
+        
+        try {
+            // Clear any existing content
+            if (this.messageInput) {
+                this.messageInput.value = '';
+            }
+            
+            this.finalTranscript = '';
+            this.interimTranscript = '';
+            
+            console.log('🎤 Starting hold-to-speak...');
+            this.recognition.start();
+            
+        } catch (error) {
+            console.error('Failed to start voice recognition:', error);
+            this.showError('Could not start voice recognition. Please try again.');
+            this.isHolding = false;
+        }
+    }
+
+    stopHoldToSpeak() {
+        if (!this.isHolding) {
+            // Not holding, no need to stop
+            return;
+        }
+        
+        this.isHolding = false;
+        
+        console.log('🎤 Stopping hold-to-speak...');
+        
+        try {
+            this.recognition.stop();
+        } catch (error) {
+            console.log('Recognition already stopped or not available');
+        }
+    }
+
+    finalizeHoldToSpeak() {
+        this.isListening = false;
+        this.isHolding = false;
+        this.updateVoiceButton();
+        
+        const finalText = this.messageInput?.value?.trim() || '';
+        
+        if (finalText) {
+            // Show success feedback
+            const duration = this.recordingStartTime ? 
+                Math.round((Date.now() - this.recordingStartTime) / 1000) : 0;
+            
+            this.updateStatus(`Sending message... (${duration}s recorded)`, '📤');
+            console.log(`🎤 Auto-sending: "${finalText.substring(0, 30)}${finalText.length > 30 ? '...' : ''}" (${duration}s)`);
+            
+            // Auto-send the message (only if callback is set)
+            if (typeof this.onSpeechResult === 'function') {
+                this.onSpeechResult(finalText);
+            } else {
+                console.error('No speech result callback set - message not sent');
+            }
+            
+            // Clear the input after sending
+            setTimeout(() => {
+                if (this.messageInput) {
+                    this.messageInput.value = '';
+                    this.messageInput.style.height = 'auto';
+                }
+                
+                this.updateMessageInputPlaceholder();
+                this.updateStatus('Ready to listen', '💙');
+            }, 500);
+            
+        } else {
+            this.updateStatus('No speech detected', '❌');
+            this.updateMessageInputPlaceholder();
+            
+            setTimeout(() => {
+                this.updateStatus('Ready to listen', '💙');
+            }, 2000);
+        }
+        
+        // Reset transcripts
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+        this.recordingStartTime = null;
     }
 
     // New method to load voice IDs from Netlify environment
@@ -70,16 +427,6 @@ class SpeechManager {
             console.error('Error loading voice IDs:', error);
             console.log('Using default voice IDs as fallback');
         }
-    }
-
-    initializeElements() {
-        this.voiceButton = document.getElementById('voice-button');
-        this.statusText = document.getElementById('status-text');
-        this.statusIndicator = document.getElementById('status-indicator');
-        this.messageInput = document.getElementById('message-input');
-        this.voiceSettingsButton = document.getElementById('voice-settings-button');
-        this.voiceSliderContainer = document.getElementById('voice-slider-container');
-        this.voiceRange = document.getElementById('voice-range');
     }
 
     showDevModeStatus() {
@@ -363,94 +710,6 @@ class SpeechManager {
         }
     }
 
-    // Hold-to-Speak Speech Recognition Setup
-    initializeSpeech() {
-        this.initializeSpeechRecognition();
-        this.initializeSpeechSynthesis();
-    }
-
-    initializeSpeechRecognition() {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this.recognition = new SpeechRecognition();
-            
-            // Hold-to-speak settings
-            this.recognition.continuous = true;        // Keep listening while held
-            this.recognition.interimResults = true;    // Show live transcription
-            this.recognition.lang = 'en-AU';
-            this.recognition.maxAlternatives = 1;
-            
-            this.recognition.onstart = () => {
-                this.isListening = true;
-                this.recordingStartTime = Date.now();
-                this.interimTranscript = '';
-                this.finalTranscript = '';
-                this.updateVoiceButton();
-                this.updateStatus('Listening... (hold button)', '👂');
-                this.updateMessageInputPlaceholder('Listening...');
-                console.log('🎤 Hold-to-speak started');
-            };
-            
-            this.recognition.onresult = (event) => {
-                this.interimTranscript = '';
-                this.finalTranscript = '';
-                
-                // Process all results
-                for (let i = 0; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        this.finalTranscript += transcript + ' ';
-                    } else {
-                        this.interimTranscript += transcript;
-                    }
-                }
-                
-                // Show live transcription in input field
-                const fullTranscript = this.finalTranscript + this.interimTranscript;
-                this.messageInput.value = fullTranscript.trim();
-                
-                // Auto-resize the input as text grows
-                this.messageInput.style.height = 'auto';
-                this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
-                
-                console.log('🎤 Live transcription:', fullTranscript);
-            };
-            
-            this.recognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
-                
-                if (event.error === 'not-allowed') {
-                    this.showError('Microphone access denied. Please allow microphone permissions and try again.');
-                } else if (event.error === 'no-speech') {
-                    // Don't show error for no speech in hold-to-speak mode
-                    console.log('No speech detected while holding');
-                } else {
-                    this.showError('Voice recognition error. Please try again.');
-                }
-            };
-            
-            this.recognition.onend = () => {
-                console.log('🎤 Speech recognition ended');
-                this.finalizeHoldToSpeak();
-            };
-            
-        } else {
-            console.log('Speech recognition not supported');
-            if (this.voiceButton) {
-                this.voiceButton.style.display = 'none';
-            }
-        }
-    }
-
-    initializeSpeechSynthesis() {
-        if (this.synthesis) {
-            this.loadVoices();
-            if (speechSynthesis.onvoiceschanged !== undefined) {
-                speechSynthesis.onvoiceschanged = () => this.loadVoices();
-            }
-        }
-    }
-
     loadVoices() {
         const voices = this.synthesis.getVoices();
         this.bestVoice = this.selectBestVoice(voices);
@@ -486,156 +745,44 @@ class SpeechManager {
         return bestVoice;
     }
 
-    // FIXED: Remove conflicting input listener - let UI Manager handle all input events
-    bindEvents() {
-        // Voice settings button (collapsible)
-        if (this.voiceSettingsButton) {
-            this.voiceSettingsButton.addEventListener('click', () => this.toggleVoiceSettings());
-        }
-
-        // Voice slider events
-        if (this.voiceRange) {
-            this.voiceRange.addEventListener('input', (e) => {
-                this.voiceMode = parseInt(e.target.value, 10);
-                this.saveVoicePreference();
-                
-                // Show feedback message
-                const messages = {
-                    0: 'Voice muted',
-                    1: 'Female voice selected',
-                    2: 'Male voice selected'
-                };
-                
-                const devNote = TalbotConfig.DEVELOPMENT_MODE ? ' (dev mode - saving credits!)' : '';
-                this.showVoiceStatus(messages[this.voiceMode] + devNote, this.voiceMode > 0);
-            });
-        }
-
-        // Hold-to-Speak Voice button events
-        if (this.voiceButton) {
-            // Mouse events for desktop
-            this.voiceButton.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                this.startHoldToSpeak();
-            });
-            
-            this.voiceButton.addEventListener('mouseup', (e) => {
-                e.preventDefault();
-                this.stopHoldToSpeak();
-            });
-            
-            this.voiceButton.addEventListener('mouseleave', (e) => {
-                // Stop if they drag mouse away while holding
-                this.stopHoldToSpeak();
-            });
-            
-            // Touch events for mobile
-            this.voiceButton.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.startHoldToSpeak();
-            });
-            
-            this.voiceButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.stopHoldToSpeak();
-            });
-            
-            this.voiceButton.addEventListener('touchcancel', (e) => {
-                e.preventDefault();
-                this.stopHoldToSpeak();
-            });
-        }
+    makeTextMoreNatural(text) {
+        let naturalText = text;
         
-        // REMOVED: The conflicting input listener that was causing duplicates
-        // The UI Manager will handle all input-related events
-        // Speech Manager will only handle voice-specific interactions
+        // Clean up text for speech
+        naturalText = naturalText.replace(/\. (I understand|I hear|That sounds)/g, '. $1');
+        naturalText = naturalText.replace(/\.{2,}/g, '.');
+        naturalText = naturalText.replace(/!{2,}/g, '!');
+        naturalText = naturalText.replace(/\?{2,}/g, '?');
+        
+        // Make more conversational
+        naturalText = naturalText.replace(/\btechniques\b/g, 'ways that might help');
+        naturalText = naturalText.replace(/\bstrategies\b/g, 'things you can try');
+        naturalText = naturalText.replace(/\bimplement\b/g, 'try');
+        naturalText = naturalText.replace(/\butilize\b/g, 'use');
+        naturalText = naturalText.replace(/^(Here are|These are)/g, 'Some things that might help are');
+        naturalText = naturalText.replace(/\bAdditionally\b/g, 'Also');
+        naturalText = naturalText.replace(/\bFurthermore\b/g, 'And');
+        naturalText = naturalText.replace(/\bHowever\b/g, 'But');
+        
+        return naturalText;
     }
 
-    // NEW METHOD: Allow UI Manager to notify Speech Manager when user types
-    handleUserTyping() {
-        // Stop speaking if Talbot is talking when user starts typing
-        if (this.isSpeaking) {
-            console.log('🔇 User started typing - stopping speech');
-            this.stopSpeaking();
+    stopSpeaking() {
+        // Stop ElevenLabs audio
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+            this.currentAudio = null;
         }
-    }
-
-    // Hold-to-Speak Methods
-
-    startHoldToSpeak() {
-        if (!this.recognition || this.isListening || this.isHolding) return;
         
-        this.isHolding = true;
-        
-        try {
-            // Clear any existing content
-            this.messageInput.value = '';
-            this.finalTranscript = '';
-            this.interimTranscript = '';
-            
-            console.log('🎤 Starting hold-to-speak...');
-            this.recognition.start();
-            
-        } catch (error) {
-            console.error('Failed to start voice recognition:', error);
-            this.showError('Could not start voice recognition. Please try again.');
-            this.isHolding = false;
+        // Stop browser TTS
+        if (this.synthesis && this.isSpeaking) {
+            this.synthesis.cancel();
         }
-    }
-
-    stopHoldToSpeak() {
-        if (!this.isHolding) return;
         
-        this.isHolding = false;
-        
-        console.log('🎤 Stopping hold-to-speak...');
-        
-        try {
-            this.recognition.stop();
-        } catch (error) {
-            console.log('Recognition already stopped');
-        }
-    }
-
-    finalizeHoldToSpeak() {
-        this.isListening = false;
-        this.isHolding = false;
+        this.isSpeaking = false;
         this.updateVoiceButton();
-        
-        const finalText = this.messageInput.value.trim();
-        
-        if (finalText) {
-            // Show success feedback
-            const duration = this.recordingStartTime ? 
-                Math.round((Date.now() - this.recordingStartTime) / 1000) : 0;
-            
-            this.updateStatus(`Sending message... (${duration}s recorded)`, '📤');
-            console.log(`🎤 Auto-sending: "${finalText}" (${duration}s)`);
-            
-            // Auto-send the message
-            this.onSpeechResult?.(finalText);
-            
-            // Clear the input after sending
-            setTimeout(() => {
-                this.messageInput.value = '';
-                this.messageInput.style.height = 'auto';
-                this.updateMessageInputPlaceholder();
-                this.updateStatus('Ready to listen', '💙');
-            }, 500);
-            
-        } else {
-            this.updateStatus('No speech detected', '❌');
-            this.updateMessageInputPlaceholder();
-            
-            setTimeout(() => {
-                this.updateStatus('Ready to listen', '💙');
-            }, 2000);
-        }
-        
-        // Reset transcripts
-        this.finalTranscript = '';
-        this.interimTranscript = '';
-        this.recordingStartTime = null;
+        this.updateStatus('Ready to listen', '💙');
     }
 
     // UI Helper Methods
@@ -731,46 +878,6 @@ class SpeechManager {
             statusDiv.style.opacity = '0';
             setTimeout(() => statusDiv.remove(), 300);
         }, 3000);
-    }
-
-    makeTextMoreNatural(text) {
-        let naturalText = text;
-        
-        // Clean up text for speech
-        naturalText = naturalText.replace(/\. (I understand|I hear|That sounds)/g, '. $1');
-        naturalText = naturalText.replace(/\.{2,}/g, '.');
-        naturalText = naturalText.replace(/!{2,}/g, '!');
-        naturalText = naturalText.replace(/\?{2,}/g, '?');
-        
-        // Make more conversational
-        naturalText = naturalText.replace(/\btechniques\b/g, 'ways that might help');
-        naturalText = naturalText.replace(/\bstrategies\b/g, 'things you can try');
-        naturalText = naturalText.replace(/\bimplement\b/g, 'try');
-        naturalText = naturalText.replace(/\butilize\b/g, 'use');
-        naturalText = naturalText.replace(/^(Here are|These are)/g, 'Some things that might help are');
-        naturalText = naturalText.replace(/\bAdditionally\b/g, 'Also');
-        naturalText = naturalText.replace(/\bFurthermore\b/g, 'And');
-        naturalText = naturalText.replace(/\bHowever\b/g, 'But');
-        
-        return naturalText;
-    }
-
-    stopSpeaking() {
-        // Stop ElevenLabs audio
-        if (this.currentAudio) {
-            this.currentAudio.pause();
-            this.currentAudio.currentTime = 0;
-            this.currentAudio = null;
-        }
-        
-        // Stop browser TTS
-        if (this.synthesis && this.isSpeaking) {
-            this.synthesis.cancel();
-        }
-        
-        this.isSpeaking = false;
-        this.updateVoiceButton();
-        this.updateStatus('Ready to listen', '💙');
     }
 
     updateStatus(text, indicator) {
