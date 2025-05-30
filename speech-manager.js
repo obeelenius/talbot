@@ -486,7 +486,7 @@ class SpeechManager {
         return bestVoice;
     }
 
-    // Hold-to-Speak Event Binding
+    // FIXED: Remove conflicting input listener - let UI Manager handle all input events
     bindEvents() {
         // Voice settings button (collapsible)
         if (this.voiceSettingsButton) {
@@ -546,14 +546,17 @@ class SpeechManager {
             });
         }
         
-        // Stop speech when typing manually
-        if (this.messageInput) {
-            this.messageInput.addEventListener('input', (e) => {
-                // Stop speaking if Talbot is talking
-                if (this.isSpeaking) {
-                    this.stopSpeaking();
-                }
-            });
+        // REMOVED: The conflicting input listener that was causing duplicates
+        // The UI Manager will handle all input-related events
+        // Speech Manager will only handle voice-specific interactions
+    }
+
+    // NEW METHOD: Allow UI Manager to notify Speech Manager when user types
+    handleUserTyping() {
+        // Stop speaking if Talbot is talking when user starts typing
+        if (this.isSpeaking) {
+            console.log('🔇 User started typing - stopping speech');
+            this.stopSpeaking();
         }
     }
 
