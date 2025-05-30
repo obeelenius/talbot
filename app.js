@@ -5,6 +5,7 @@ class TalbotApp {
         this.profileManager = null;
         this.conversationManager = null;
         this.aiResponseManager = null;
+        this.speechManager = null;
         
         this.init();
     }
@@ -38,16 +39,19 @@ class TalbotApp {
     }
 
     initializeManagers() {
-        // Initialize UI Manager first
+        // Initialize Profile Manager first
+        this.profileManager = new ProfileManager();
+        
+        // Initialize UI Manager (which will create its own SpeechManager)
         this.uiManager = new UIManager();
         
-        // Initialize Profile Manager
-        this.profileManager = new ProfileManager();
+        // Get speech manager reference from UI Manager
+        this.speechManager = this.uiManager.getSpeechManager();
         
         // Initialize Conversation Manager
         this.conversationManager = new ConversationManager(this.uiManager, this.profileManager);
         
-        // Initialize AI Response Manager (using your existing structure)
+        // Initialize AI Response Manager
         this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
     }
 
@@ -58,6 +62,7 @@ class TalbotApp {
         window.profileManager = this.profileManager;
         window.conversationManager = this.conversationManager;
         window.aiResponseManager = this.aiResponseManager;
+        window.speechManager = this.speechManager;
         
         // For backward compatibility, also set aiHandler to point to aiResponseManager
         window.aiHandler = this.aiResponseManager;
@@ -178,7 +183,8 @@ class TalbotApp {
                 uiManager: !!this.uiManager,
                 profileManager: !!this.profileManager,
                 conversationManager: !!this.conversationManager,
-                aiResponseManager: !!this.aiResponseManager
+                aiResponseManager: !!this.aiResponseManager,
+                speechManager: !!this.speechManager
             },
             localStorage: this.checkLocalStorageAccess(),
             domElements: this.checkCriticalElements()
@@ -206,9 +212,11 @@ class TalbotApp {
 
     checkCriticalElements() {
         const criticalElements = [
-            'messages-container',
+            'messages',
             'message-input',
-            'send-button'
+            'send-button',
+            'voice-button',
+            'voice-settings-button'
         ];
 
         return criticalElements.reduce((acc, id) => {
@@ -223,6 +231,8 @@ class TalbotApp {
             if (!this.uiManager) {
                 this.uiManager = new UIManager();
                 window.uiManager = this.uiManager;
+                this.speechManager = this.uiManager.getSpeechManager();
+                window.speechManager = this.speechManager;
             }
             
             if (!this.aiResponseManager) {
@@ -298,11 +308,13 @@ class TalbotApp {
                 uiManager: !!this.uiManager,
                 profileManager: !!this.profileManager,
                 conversationManager: !!this.conversationManager,
-                aiResponseManager: !!this.aiResponseManager
+                aiResponseManager: !!this.aiResponseManager,
+                speechManager: !!this.speechManager
             },
             hasProfile: this.profileManager?.hasProfile() || false,
             hasMessages: this.uiManager?.hasMessages() || false,
-            hasConversationMemory: this.conversationManager?.hasConversationMemory() || false
+            hasConversationMemory: this.conversationManager?.hasConversationMemory() || false,
+            voiceAvailable: !!this.speechManager
         };
     }
 
@@ -314,7 +326,8 @@ class TalbotApp {
             conversationMemory: this.conversationManager?.getConversationMemory() || null,
             stats: {
                 messageStats: this.uiManager?.getMessageStats() || null,
-                conversationStats: this.aiResponseManager?.getConversationStats() || null
+                conversationStats: this.aiResponseManager?.getConversationStats() || null,
+                voiceStats: this.speechManager?.getUsageStats() || null
             }
         };
 
