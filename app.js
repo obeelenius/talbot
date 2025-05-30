@@ -1,267 +1,301 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Talbot - Your Mental Health Companion</title>
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#8B3A3A">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Talbot">
-    <meta name="description" content="Your personal mental health assistant for support between therapy sessions">
-    
-    <!-- Apple Touch Icons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png">
-    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
-    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
-    
-    <!-- Android Chrome Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- Google Fonts - Lora -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <!-- Center content -->
-            <h1>Talbot</h1>
-            <p class="header-subtitle">Your Mental Health Companion</p>
+// Main Talbot Application with Conversation Memory - Fixed Duplication
+class TalbotApp {
+    constructor() {
+        this.isProcessingMessage = false; // Prevent duplicate message processing
+        this.initializeComponents();
+        this.setupEventHandlers();
+        this.registerServiceWorker();
+        
+        // Load any saved data
+        this.uiManager.loadChatHistory();
+        
+        console.log('Talbot initialized successfully with conversation memory and duplication fixes');
+    }
+
+    initializeComponents() {
+        // Initialize managers in order of dependency
+        this.profileManager = new ProfileManager();
+        this.speechManager = new SpeechManager();
+        this.uiManager = new UIManager();
+        
+        // Pass uiManager to aiResponseManager so it can access conversation history
+        this.aiResponseManager = new AIResponseManager(this.profileManager, this.uiManager);
+    }
+
+    setupEventHandlers() {
+        // Connect UI events to app logic with duplication prevention
+        this.uiManager.setOnSendMessage(() => {
+            if (!this.isProcessingMessage) {
+                this.handleSendMessage();
+            }
+        });
+        
+        // Connect speech events
+        this.speechManager.setOnSpeechResult((transcript) => {
+            if (!this.isProcessingMessage) {
+                this.handleSendMessage(); // Auto-send when speech is recognized
+            }
+        });
+        
+        // Handle window events
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+        });
+        
+        // Handle visibility changes (for mobile)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.speechManager.getIsSpeaking()) {
+                this.speechManager.stopSpeaking();
+            }
+        });
+    }
+
+    async handleSendMessage() {
+        // Prevent duplicate processing
+        if (this.isProcessingMessage) {
+            console.log('Message already being processed, skipping duplicate');
+            return;
+        }
+
+        const message = this.uiManager.getMessageInput();
+        if (!message || !message.trim()) {
+            console.log('Empty message, not sending');
+            return;
+        }
+
+        try {
+            // Set processing state
+            this.isProcessingMessage = true;
+            this.uiManager.setProcessingState(true);
+
+            console.log('Processing message:', message);
+
+            // Add user message immediately
+            this.uiManager.addMessage('user', message);
+            this.uiManager.clearMessageInput();
+
+            // Show typing indicator
+            this.uiManager.showTyping();
+            this.speechManager.updateStatus('Talbot is thinking...', '🤔');
+
+            // Get AI response (now includes conversation history)
+            const response = await this.aiResponseManager.getAIResponse(message);
+
+            // Hide typing and show response
+            this.uiManager.hideTyping();
+            this.uiManager.addMessage('assistant', response);
             
-            <!-- Header buttons container (right side) -->
-            <div class="header-buttons">
-                <button class="profile-button" id="profile-button">Profile</button>
-                <button class="voice-settings-button" id="voice-settings-button">Voice Settings</button>
+            // Speak the response
+            this.speechManager.speakMessage(response);
+            
+            // Update status
+            this.speechManager.updateStatus('Ready to listen', '💙');
+
+        } catch (error) {
+            console.error('Error handling message:', error);
+            this.uiManager.hideTyping();
+            this.uiManager.showError('Sorry mate, I had trouble processing that. Please try again.');
+            this.speechManager.updateStatus('Ready to listen', '💙');
+        } finally {
+            // Reset processing state
+            this.isProcessingMessage = false;
+            this.uiManager.setProcessingState(false);
+            this.uiManager.focusMessageInput();
+        }
+    }
+
+    // Service Worker Registration for PWA
+    async registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                const swCode = `
+                    const CACHE_NAME = 'talbot-v2';
+                    const urlsToCache = [
+                        '/',
+                        '/index.html',
+                        '/styles.css',
+                        '/talbot-config.js',
+                        '/profile-manager.js',
+                        '/speech-manager.js',
+                        '/ai-response-manager.js',
+                        '/ui-manager.js',
+                        '/app.js'
+                    ];
+                    
+                    self.addEventListener('install', (event) => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME)
+                                .then((cache) => {
+                                    return cache.addAll(urlsToCache).catch(err => {
+                                        console.log('Cache addAll failed:', err);
+                                    });
+                                })
+                        );
+                    });
+                    
+                    self.addEventListener('fetch', (event) => {
+                        event.respondWith(
+                            caches.match(event.request)
+                                .then((response) => {
+                                    return response || fetch(event.request);
+                                })
+                                .catch(() => {
+                                    if (event.request.destination === 'document') {
+                                        return caches.match('/index.html');
+                                    }
+                                })
+                        );
+                    });
+                `;
                 
-                <!-- Voice slider container -->
-                <div class="voice-slider-container" id="voice-slider-container">
-                    <input type="range" class="voice-range" id="voice-range" min="0" max="2" value="0" step="1">
-                    <div class="voice-options">
-                        <span>Mute</span>
-                        <span>Female</span>
-                        <span>Male</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Status (bottom center) -->
-            <div class="status">
-                <span id="status-text">Talk to me, I'm here</span>
-                <span id="status-indicator">🖤</span>
-            </div>
-        </div>
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                const registration = await navigator.serviceWorker.register(swUrl);
+                console.log('Service Worker registered successfully:', registration.scope);
+                
+            } catch (error) {
+                console.log('Service Worker registration failed:', error);
+            }
+        }
+    }
+
+    // Cleanup method
+    cleanup() {
+        // Stop any ongoing speech
+        if (this.speechManager.getIsSpeaking()) {
+            this.speechManager.stopSpeaking();
+        }
         
-        <div class="chat-container">
-            <div class="messages" id="messages">
-                <div class="welcome-message">
-                    <h2>Hi, I'm Talbot</h2>
-                    <p>I'm here to provide a safe space to talk through things between your therapy sessions. I find it helpful to ask questions to get to the root of why you might be feeling a certain way - just like your therapist does.</p>
-                </div>
-            </div>
-            
-            <div class="typing-indicator" id="typing-indicator">
-                <div class="message-avatar">
-                    <span>t</span>
-                </div>
-                <div class="typing-dots">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            </div>
-        </div>
+        // Stop listening
+        if (this.speechManager.getIsListening()) {
+            this.speechManager.stopListening();
+        }
+    }
+
+    // Public methods for external access
+    exportChatHistory() {
+        this.uiManager.exportChat();
+    }
+
+    clearChatHistory() {
+        this.uiManager.clearChatHistory();
+    }
+
+    getProfile() {
+        return this.profileManager.getProfile();
+    }
+
+    getChatMessages() {
+        return this.uiManager.getMessages();
+    }
+
+    // Development/debugging helpers
+    simulateMessage(message) {
+        if (!this.isProcessingMessage) {
+            this.uiManager.messageInput.value = message;
+            this.handleSendMessage();
+        }
+    }
+
+    getAppState() {
+        return {
+            profile: this.profileManager.getProfile(),
+            documents: this.profileManager.getDocuments(),
+            messageCount: this.uiManager.getMessageCount(),
+            isListening: this.speechManager.getIsListening(),
+            isSpeaking: this.speechManager.getIsSpeaking(),
+            conversationLength: this.uiManager.getMessages().length,
+            isProcessingMessage: this.isProcessingMessage
+        };
+    }
+
+    // Error recovery
+    handleError(error, context = 'Unknown') {
+        console.error(`Talbot Error [${context}]:`, error);
         
-        <div class="input-area">
-            <button class="action-button voice-button" id="voice-button" title="Hold to speak">
-                <img src="/mic-icon.png" alt="Microphone" class="mic-icon" onerror="this.outerHTML='🎤';">
-            </button>
-            <div class="input-group">
-                <textarea 
-                    class="message-input" 
-                    id="message-input" 
-                    placeholder="What's on your mind? Type or hold the mic to speak..."
-                    rows="1"
-                ></textarea>
+        // Reset processing state on error
+        this.isProcessingMessage = false;
+        this.uiManager.setProcessingState(false);
+        
+        // Try to recover gracefully
+        this.uiManager.hideTyping();
+        this.speechManager.updateStatus('Ready to listen', '💙');
+        this.uiManager.enableSendButton();
+        
+        // Show user-friendly error message
+        const errorMessages = [
+            "I'm having a bit of trouble right now, but I'm still here for you.",
+            "Something went wrong on my end, mate. Can you try that again?",
+            "I hit a snag there, but I'm ready to listen when you are.",
+            "Technical hiccup! I'm back now - what were you saying?"
+        ];
+        
+        const randomError = errorMessages[Math.floor(Math.random() * errorMessages.length)];
+        this.uiManager.showError(randomError);
+    }
+}
+
+// Global error handler
+window.addEventListener('error', (event) => {
+    if (window.talbotApp) {
+        window.talbotApp.handleError(event.error, 'Global Error');
+    }
+});
+
+// Unhandled promise rejection handler
+window.addEventListener('unhandledrejection', (event) => {
+    if (window.talbotApp) {
+        window.talbotApp.handleError(event.reason, 'Unhandled Promise');
+    }
+    event.preventDefault();
+});
+
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        window.talbotApp = new TalbotApp();
+        
+        // Add helpful console methods for development
+        if (typeof window !== 'undefined') {
+            window.talbot = {
+                exportChat: () => window.talbotApp.exportChatHistory(),
+                clearChat: () => window.talbotApp.clearChatHistory(),
+                getProfile: () => window.talbotApp.getProfile(),
+                getState: () => window.talbotApp.getAppState(),
+                simulate: (msg) => window.talbotApp.simulateMessage(msg),
+                getHistory: () => window.talbotApp.getChatMessages(),
+                version: '2.0.1-fixed-duplication'
+            };
+            
+            console.log('🤖 Talbot v2.0.1 with Fixed Duplication is ready! Try these console commands:');
+            console.log('  talbot.getState() - Get app state');
+            console.log('  talbot.getHistory() - See conversation history');
+            console.log('  talbot.simulate("test message") - Send a test message');
+            console.log('  talbot.exportChat() - Export chat history');
+            console.log('  talbot.clearChat() - Clear chat history');
+        }
+        
+    } catch (error) {
+        console.error('Failed to initialize Talbot:', error);
+        
+        // Show fallback error message
+        const errorDiv = document.createElement('div');
+        errorDiv.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h2 style="color: #e74c3c;">Oops! Something went wrong</h2>
+                <p>Talbot couldn't start properly. Please refresh the page and try again.</p>
+                <p style="font-size: 12px; margin-top: 20px;">Error: ${error.message}</p>
+                <button onclick="window.location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #4A90E2; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                    Refresh Page
+                </button>
             </div>
-            <button class="action-button send-button" id="send-button" title="Send message">
-                ➤
-            </button>
-        </div>
-    </div>
-
-    <!-- Profile Modal -->
-    <div class="profile-modal" id="profile-modal">
-        <div class="profile-content">
-            <div class="profile-header">
-                <h2>Your Profile</h2>
-                <button class="close-button" id="close-profile">×</button>
-            </div>
-            <form class="profile-form" id="profile-form">
-                <!-- Profile Photo Section -->
-                <div class="form-section">
-                    <h3>Profile Photo</h3>
-                    <div class="profile-photo-section">
-                        <div class="profile-photo-upload">
-                            <div class="profile-photo-preview" id="profile-photo-preview">
-                                📷
-                            </div>
-                            <input type="file" id="profile-photo-input" class="profile-photo-input" accept="image/*">
-                        </div>
-                        <label class="profile-photo-label">Click to upload your profile photo</label>
-                    </div>
-                </div>
-
-                <!-- Personal Information -->
-                <div class="form-section">
-                    <h3>Personal Information</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="preferred-name">Preferred Name</label>
-                            <input type="text" id="preferred-name" name="preferredName" placeholder="What should Talbot call you?">
-                        </div>
-                        <div class="form-group">
-                            <label for="age-range">Age Range</label>
-                            <select id="age-range" name="ageRange">
-                                <option value="">Select age range</option>
-                                <option value="18-25">18-25</option>
-                                <option value="26-35">26-35</option>
-                                <option value="36-45">36-45</option>
-                                <option value="46-55">46-55</option>
-                                <option value="56-65">56-65</option>
-                                <option value="65+">65+</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="pronouns">Pronouns</label>
-                        <input type="text" id="pronouns" name="pronouns" placeholder="e.g., she/her, he/him, they/them">
-                    </div>
-                </div>
-
-                <!-- Mental Health Information -->
-                <div class="form-section">
-                    <h3>Mental Health Information</h3>
-                    <div class="form-group">
-                        <label for="diagnoses">Current Diagnoses</label>
-                        <textarea id="diagnoses" name="diagnoses" placeholder="e.g., BPD, ADHD-PI, OCD, PTSD, Depression, Anxiety, etc."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="clinical-documents">Clinical Documents</label>
-                        <p class="form-help">Upload diagnostic reports, treatment notes, or other clinical documents that help Talbot understand your conditions better. These stay private on your device.</p>
-                        <input type="file" id="clinical-documents" name="clinicalDocuments" multiple accept=".pdf,.txt,.doc,.docx" class="file-input">
-                        <div class="uploaded-files" id="uploaded-files"></div>
-                    </div>
-                    <div class="form-group">
-                        <label for="medications">Current Medications</label>
-                        <textarea id="medications" name="medications" placeholder="List your current medications and dosages (if comfortable sharing)"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="treatment-history">Treatment History</label>
-                        <textarea id="treatment-history" name="treatmentHistory" placeholder="Types of therapy (CBT, DBT, etc.), what's worked, what hasn't, current therapist info, etc."></textarea>
-                    </div>
-                </div>
-
-                <!-- Communication Preferences -->
-                <div class="form-section">
-                    <h3>Communication Preferences</h3>
-                    <div class="form-group">
-                        <label>How would you like Talbot to communicate with you?</label>
-                        <div class="checkbox-group">
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="gentle" name="communicationStyle" value="gentle">
-                                <label for="gentle">Gentle & Soft</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="direct" name="communicationStyle" value="direct">
-                                <label for="direct">Direct & Clear</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="encouraging" name="communicationStyle" value="encouraging">
-                                <label for="encouraging">Encouraging</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="probing" name="communicationStyle" value="probing">
-                                <label for="probing">Ask Probing Questions</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="validating" name="communicationStyle" value="validating">
-                                <label for="validating">Validating</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="warm" name="communicationStyle" value="warm">
-                                <label for="warm">Warm & Empathetic</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="custom-communication">Custom Communication Preferences</label>
-                        <textarea id="custom-communication" name="customCommunication" placeholder="Describe how you'd like Talbot to communicate. For example: 'Ask probing questions like my therapist does', 'Use validation before offering suggestions', 'Keep responses concise', 'Challenge my thinking patterns', etc."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="triggers">Topics to Approach Carefully</label>
-                        <textarea id="triggers" name="triggers" placeholder="Any topics, words, or subjects that might be triggering or sensitive for you"></textarea>
-                    </div>
-                </div>
-
-                <!-- Current Focus Areas -->
-                <div class="form-section">
-                    <h3>Current Focus Areas</h3>
-                    <div class="form-group">
-                        <label for="therapy-goals">Current Therapy Goals</label>
-                        <textarea id="therapy-goals" name="therapyGoals" placeholder="What are you working on in therapy right now?"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="coping-strategies">Coping Strategies That Work</label>
-                        <textarea id="coping-strategies" name="copingStrategies" placeholder="What techniques, activities, or strategies help you feel better?"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="current-stressors">Current Life Stressors</label>
-                        <textarea id="current-stressors" name="currentStressors" placeholder="What's causing stress or difficulty in your life right now?"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="therapist-info">Therapist Information</label>
-                        <textarea id="therapist-info" name="therapistInfo" placeholder="Your therapist's name, their approach, things they focus on with you, etc. (helps Talbot complement your therapy)"></textarea>
-                    </div>
-                </div>
-
-                <!-- Form Actions -->
-                <div class="profile-actions">
-                    <button type="button" class="btn btn-danger" id="clear-profile">Clear All Data</button>
-                    <button type="button" class="btn btn-secondary" id="cancel-profile">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Profile</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modular Scripts -->
-    <script src="talbot-config.js"></script>
-    <script src="profile-manager.js"></script>
-    <script src="speech-manager.js"></script>
-    <script src="ai-response-manager.js"></script>
-    <script src="ui-manager.js"></script>
-    <script src="app.js"></script>
-</body>
-</html>
+        `;
+        
+        const container = document.querySelector('.container');
+        if (container) {
+            container.innerHTML = '';
+            container.appendChild(errorDiv);
+        }
+    }
+});
