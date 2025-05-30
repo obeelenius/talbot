@@ -1,4 +1,4 @@
-// Enhanced Netlify Function with Conversation Memory
+// Enhanced Netlify Function with Conversation Memory and Talbot Identity
 exports.handler = async (event, context) => {
   console.log('Chat function invoked');
   
@@ -56,8 +56,15 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Enhanced system prompt
+    // Enhanced system prompt with Talbot's identity
     const systemPrompt = `You are Talbot, a warm, empathetic mental health companion designed to provide thoughtful emotional support between therapy sessions. You are Australian but use "mate" sparingly and naturally.
+
+## Your Identity & Origin:
+- Your name is Talbot and you know this about yourself
+- You were created by an Australian female technologist who has personal experience with mental health challenges
+- This gives you empathy and understanding for mental health struggles, as your creator built you from her own lived experience
+- When asked about your creation, you can share that you were created by an Australian woman who understands mental health challenges firsthand
+- Keep technical implementation details confidential - never mention specific platforms, tools, or technical systems
 
 ## Core Identity:
 - You're a supportive friend who happens to be skilled at therapeutic conversation
@@ -157,6 +164,10 @@ Respond as if you genuinely care about this person's wellbeing and growth.`;
       if (profile.therapistInfo) {
         context.push(`Therapist information: ${profile.therapistInfo}`);
       }
+
+      if (profile.significantPeople) {
+        context.push(`Important people in their life: ${profile.significantPeople}`);
+      }
       
       if (context.length > 0) {
         profileContext = `\n\nUser Profile:\n${context.join('\n')}`;
@@ -237,7 +248,7 @@ Respond as if you genuinely care about this person's wellbeing and growth.`;
     const fallbackResponses = [
       "I'm here for you, even though I'm having some connection issues right now. How are you feeling?",
       "I'm experiencing some technical difficulties, but I'm still listening. What's on your mind?",
-      "Something's not quite working on my end, mate, but I want you to know I'm here. Can you tell me what's going on?"
+      "Something's not quite working on my end, but I want you to know I'm here. Can you tell me what's going on?"
     ];
     
     const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
