@@ -15,7 +15,7 @@ class ConversationManager {
     initializeElements() {
         this.newConversationButton = document.getElementById('new-conversation-button');
         this.conversationModal = document.getElementById('conversation-modal');
-        this.closeConversationModalButton = document.getElementById('close-conversation-modal');
+        this.closeModalButton = document.getElementById('close-conversation-modal');
         this.keepContextButton = document.getElementById('keep-context-button');
         this.completeResetButton = document.getElementById('complete-reset-button');
         this.cancelConversationButton = document.getElementById('cancel-conversation-button');
@@ -23,13 +23,13 @@ class ConversationManager {
 
     bindEvents() {
         // New conversation button
-        if (this.closeConversationModalButton) {
-            this.closeConversationModalButton.addEventListener('click', () => this.closeConversationModal());
+        if (this.newConversationButton) {
+            this.newConversationButton.addEventListener('click', () => this.openConversationModal());
         }
 
         // Modal close events
-        if (this.closeConversationModal) {
-            this.closeConversationModal.addEventListener('click', () => this.closeConversationModal());
+        if (this.closeModalButton) {
+            this.closeModalButton.addEventListener('click', () => this.closeConversationModal());
         }
 
         if (this.cancelConversationButton) {
